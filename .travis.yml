@@ -5,14 +5,7 @@ before_install:
     - sudo apt-get update
     - sudo apt-get install libgtest-dev
     - "cd /usr/src/gtest && sudo cmake . && sudo cmake --build . && sudo mv libg* /usr/local/lib/ ; cd -"
-    - echo $LANG
-    - echo $LC_ALL
-    - rvm use $RVM --install --binary --fuzzy
-    - gem update --system
-    - gem --version
 before_script:
-    - travis_entry bundle
-    - travis_retry ./configure
     - pwd
     - cd samples/STL/
     - pwd
@@ -27,5 +20,5 @@ notifications:
     email:
         on_success: change
         on_failure: always
-env:
-    - RVM=2.0.0 LANG="en_US.UTF-8"
+rvm:
+    - 9.00
