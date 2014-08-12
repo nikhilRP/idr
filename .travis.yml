@@ -8,7 +8,7 @@ before_install:
 before_script:
     - pwd
     - which sh
-script: "sh ./.travis_build.sh && cd ../../tests/ && sh ./.travis_build.sh"
+script: "cd tests && sh travis_build.sh"
 branches:
     only:
         - master
