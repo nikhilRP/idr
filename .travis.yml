@@ -7,8 +7,6 @@ before_install:
     - "cd /usr/src/gtest && sudo cmake . && sudo cmake --build . && sudo mv libg* /usr/local/lib/ ; cd -"
 before_script:
     - pwd
-    - cd samples/STL/
-    - pwd
     - which sh
 script: "sh ./.travis_build.sh && cd ../../tests/ && sh ./.travis_build.sh"
 branches:
