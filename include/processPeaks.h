@@ -10,8 +10,8 @@
 #ifndef PEAK_PROCESS_H
 #define PEAK_PROCESS_H
 
-#include "bedtools/bedFile.h"
-#include "bedtools/genomeFile.h"
+#include <bedtools/bedFile.h>
+#include <bedtools/genomeFile.h>
 
 #include <vector>
 #include <iostream>

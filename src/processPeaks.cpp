@@ -7,11 +7,11 @@
   Licensed under the GNU General Public License 2.0 license.
 ******************************************************************************/
 
-#include "processPeaks.h"
-#include "bedtools/lineFileUtilities.h"
-#include "bedtools/genomeFile.h"
-#include "bedtools/bedFile.h"
-#include "bedtools/interval.h"
+#include <processPeaks.h>
+#include <lineFileUtilities.h>
+#include <genomeFile.h>
+#include <bedFile.h>
+#include <interval.h>
 
 /*
 Constructor

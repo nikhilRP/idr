@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
-project(IDR)
+project(idr)
 
 if($ENV{BUILD_NUMBER})
   set(BUILD_NUMBER $ENV{BUILD_NUMBER})
@@ -50,8 +50,8 @@ endif()
 # Licensing and stuff like that
 set(LICENSE_FILE ${PROJECT_SOURCE_DIR}/LICENSE-MIT)
 install(FILES
-	${README_FILE}
-	${LICENSE_FILE}
+    ${README_FILE}
+    ${LICENSE_FILE}
   DESTINATION .
 )
 # Packaging steps

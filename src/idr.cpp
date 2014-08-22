@@ -10,8 +10,8 @@
 #include <string>
 #include <stdlib.h>
 
-#include "processPeaks.h"
-#include "ranker.h"
+#include <processPeaks.h>
+#include <ranker.h>
 
 using namespace std;
 
