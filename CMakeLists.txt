@@ -11,7 +11,8 @@ set(MYLIB_NAME "IDR")
 set(MYLIB_VERSION "0.1.0.${BUILD_NUMBER}")
 set(MYLIB_BRIEF "${MYLIB_NAME} is a C++ implementation of Irreproducible Discovery Rate")
 
-option(MYLIB_TESTS_ENABLED "Enable tests build" ON)
+# Not using this for now
+#option(MYLIB_TESTS_ENABLED "Enable tests build" ON)
 
 # code coverage options
 set(GCOV_FLAGS "-fprofile-arcs -ftest-coverage")
@@ -35,9 +36,9 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release)
 
 add_subdirectory(src)
 
-if(MYLIB_TESTS_ENABLED)
-  add_subdirectory(test)
-endif()
+#if(MYLIB_TESTS_ENABLED)
+#  add_subdirectory(test)
+#endif()
 
 # used by doc home and in packaging
 set(README_FILE ${PROJECT_SOURCE_DIR}/README.md)
