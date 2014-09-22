@@ -1,4 +1,4 @@
-#include "bedFile.h"
+#include <bedFile.h>
 
 /***********************************************
 Sorting comparison functions
