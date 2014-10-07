@@ -43,11 +43,6 @@ add_subdirectory(src)
 # used by doc home and in packaging
 set(README_FILE ${PROJECT_SOURCE_DIR}/README.md)
 
-# documentation
-if(NOT DOC_DISABLED)
-  add_subdirectory(doc)
-endif()
-
 # Licensing and stuff like that
 set(LICENSE_FILE ${PROJECT_SOURCE_DIR}/LICENSE-MIT)
 install(FILES
@@ -55,20 +50,3 @@ install(FILES
     ${LICENSE_FILE}
   DESTINATION .
 )
-# Packaging steps
-#set(CPACK_SYSTEM_NAME ${CMAKE_SYSTEM_NAME}_${CMAKE_SYSTEM_PROCESSOR})
-set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
-set(CPACK_PACKAGE_DESCRIPTION_FILE ${README_FILE})
-set(CPACK_RESOURCE_FILE_LICENSE ${LICENSE_FILE})
-set(CPACK_GENERATOR "ZIP") #;TGZ;STGZ")
-set(CPACK_COMPONENT_LIBRARIES_DISPLAY_NAME "Libraries")
-set(CPACK_COMPONENT_HEADERS_DISPLAY_NAME "C++ Headers")
-set(CPACK_COMPONENTS_ALL libraries headers)
-set(CPACK_PACKAGE_NAME ${MYLIB_NAME})
-set(CPACK_PACKAGE_VENDOR "Acme")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${MYLIB_NAME} - ${MYLIB_BRIEF}")
-set(CPACK_PACKAGE_VERSION ${MYLIB_VERSION})
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "TODO")
-# must be executed after CPACK properties definition
-include(CPack)
-
