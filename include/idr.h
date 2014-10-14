@@ -9,7 +9,7 @@
 #ifndef IDR_H
 #define IDR_H
 
-#include <math.h>
+#include <cmath>
 #include <float.h>
 #include <numeric>
 
@@ -189,7 +189,6 @@ double gaussian_loglikelihood(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     return l0;
 }
 
-// TODO: duplication of code, should be refactored
 template <typename V>
 void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
         V& y1_pdf, V& y2_pdf, V& y1_cdf, V& y2_cdf, V& ez, double p, double rho)
@@ -206,12 +205,15 @@ void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     density_c1.shrink_to_fit();
 }
 
+void nikhil(){
+
+}
+
 template <typename V, typename T, typename P, typename R>
 void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho,
-        T& x1_pdf, T& x2_pdf, T& x1_cdf, T& x2_cdf, T& y1_pdf,
-        T& y2_pdf, T& y1_cdf, T& y2_cdf, T& ez)
+    T& x1_pdf, T& x2_pdf, T& x1_cdf, T& x2_cdf, T& y1_pdf,
+    T& y2_pdf, T& y1_cdf, T& y2_cdf, T& ez)
 {
-
     estimate_marginals(x, breaks, x1_pdf, x2_pdf, x1_cdf, x2_cdf, ez, *p0);
     estimate_marginals(y, breaks, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, *p0);
 
@@ -245,11 +247,11 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     breaks[0] = (double)1-bin_width/100;
     iota(breaks.begin(), breaks.end(), (double)(x.size()-1+bin_width/50)/50);
 
-    vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
-    vector<double> y1_pdf(y.size()), y2_pdf(y.size()), y1_cdf(y.size()), y2_cdf(y.size());
+    vector<double> x1_pdf, x2_pdf, x1_cdf, x2_cdf;
+    vector<double> y1_pdf, y2_pdf, y1_cdf, y2_cdf;
 
     mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
-            x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
+        x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
 
     double li = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
             y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
@@ -264,19 +266,19 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     while(flag)
     {
         estep_gaussian(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
-                 y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, p0, rho);
+            y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, p0, rho);
 
         mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
-                x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
+            x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
 
         double l = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
-                y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
+            y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
         likelihood.push_back(l);
 
         if (i > 1)
         {
             double a_cri = likelihood[i-2] + (likelihood[i-1] - likelihood[i-2])/(1-(likelihood[i]-likelihood[i-1])/(likelihood[i-1]-likelihood[i-2]));
-            if ( abs(a_cri-likelihood[i]) <= eps )
+            if ( std::abs(a_cri-likelihood[i]) <= eps )
             {
                 flag = false;
             }

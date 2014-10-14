@@ -184,7 +184,6 @@ int main(int argc, char* argv[])
         vector<int> ranks_A, ranks_B;
         rank_vec(unmatched_merge_A, ranks_A, "default");
         rank_vec(unmatched_merge_B, ranks_B, "default");
-
         vector<double> idrLocal( ranks_A.size() );
         em_gaussian(ranks_A, ranks_B, idrLocal);
         return 0;
