@@ -13,26 +13,50 @@
 #include <float.h>
 #include <numeric>
 
+
+double RationalApproximation(double t)
+{
+    // Abramowitz and Stegun formula 26.2.23.
+    // The absolute value of the error should be less than 4.5 e-4.
+    double c[] = {2.515517, 0.802853, 0.010328};
+    double d[] = {1.432788, 0.189269, 0.001308};
+    return t - ((c[2]*t + c[1])*t + c[0]) / (((d[2]*t + d[1])*t + d[0])*t + 1.0);
+}
+
+double NormalCDFInverse(double p)
+{
+    if (p < 0.5)
+    {
+        // F^-1(p) = - G^-1(p)
+        return -RationalApproximation( sqrt(-2.0*log(p)) );
+    }
+    else
+    {
+        // F^-1(p) = G^-1(1-p)
+        return RationalApproximation( sqrt(-2.0*log(1-p)) );
+    }
+}
+
 template <typename V>
-void calculate_quantiles(V& x_cdf, V& y_cdf, V rho, V& density)
+void calculate_quantiles(V& x_cdf, V& y_cdf, V& density, double rho)
 {
     for(int i=0; i<x_cdf.size(); ++i)
     {
-        double a = pow(normcdfinv(x_cdf[i]), 2) + pow(normcdfinv(y_cdf[i]), 2);
-        double b = normcdfinv(x_cdf[i]) * normcdfinv(y_cdf[i]);
+        double a = pow(NormalCDFInverse(x_cdf[i]), 2) + pow(NormalCDFInverse(y_cdf[i]), 2);
+        double b = NormalCDFInverse(x_cdf[i]) * NormalCDFInverse(y_cdf[i]);
         density[i] = exp( -log(1 - pow(rho, 2)) / 2 - rho / (2 * (1 - pow(rho, 2))) * (rho*a-2*b) );
     }
 }
 
 template <typename V>
-double cost_function(V& x_cdf, V& y_cdf, V& ez, V rho)
+double cost_function(V& x_cdf, V& y_cdf, V& ez, double rho)
 {
     typedef typename V::value_type ValueType;
 
     vector<ValueType> density(x_cdf.size());
     vector<ValueType> new_density(x_cdf.size());
 
-    calculate_quantiles(x_cdf, y_cdf, rho, density);
+    calculate_quantiles(x_cdf, y_cdf, density, rho);
 
     ValueType cop_den = 0.0;
     for(int i=0; i<density.size(); ++i)
@@ -40,21 +64,6 @@ double cost_function(V& x_cdf, V& y_cdf, V& ez, V rho)
         cop_den = cop_den + (ez[i] * log(density[i]));
     }
     return -cop_den;
-}
-
-void calculate_quantiles()
-{
-
-}
-
-void sum_likelihood()
-{
-
-}
-
-void get_ez()
-{
-
 }
 
 template <typename V>
@@ -172,20 +181,17 @@ double gaussian_loglikelihood(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     typedef typename V::value_type ValueType;
 
     vector<ValueType> density_c1( x1_pdf.size() );
-    vector<ValueType> likelihood_vec( x1_pdf.size() );
+    double l0 = 0.0;
 
     // rewrite this
-    calculate_quantiles();
-    sum_likelihood();
-
-    double l0 = accumulate(likelihood_vec.begin(), likelihood_vec.end(), 0.0);
+    calculate_quantiles(x1_cdf, y1_cdf, density_c1, rho);
+    for(int i=0; i<density_c1.size(); ++i)
+    {
+        l0 = l0 + log(p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1.0 - p) * 1.0 * x2_pdf[i] * y2_pdf[i]);
+    }
 
     density_c1.clear();
     density_c1.shrink_to_fit();
-
-    likelihood_vec.clear();
-    likelihood_vec.shrink_to_fit();
-
     return l0;
 }
 
@@ -198,15 +204,105 @@ void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     vector<ValueType> density_c1( x1_pdf.size() );
 
     // Rewrite those GPU kernals
-    calculate_quantiles();
-    get_ez();
+    calculate_quantiles(x1_cdf, y1_cdf, density_c1, rho);
+    for(int i=0; i<ez.size(); ++i)
+    {
+        ez[i] = p * density_c1[i] * x1_pdf[i] * y1_pdf[i] / (p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1-p) * 1 * x2_pdf[i] * y2_pdf[i]);
+    }
 
     density_c1.clear();
     density_c1.shrink_to_fit();
 }
 
-void nikhil(){
+template <typename V>
+void prescan(V& x, V& y)
+{
+    int n=sizeof(x)/sizeof(int);
+    for (int i=0;i<=(log(n)-1);i++)
+    {
+        for (int j=0;j<=n-1;j++)
+        {
+            y[j] = x[j];
+            if (j>=(powf(2,i)))
+            {
+                int t=powf(2,i);
+                y[j] += x[j-t];
+            }
+        }
+        for (int j=0;j<=n-1;j++)
+        {
+            x[j] = y[j];
+        }
+    }
+}
 
+template <typename V, typename T>
+void estimate_marginals(V& input, T& breaks, T& pdf_1,
+    T& pdf_2, T& cdf_1, T& cdf_2, T& ez, double p)
+{
+    int nbins = breaks.size() - 1;
+    int input_size = input.size();
+
+    vector<double> temp_cdf_1(nbins), temp_cdf_2(nbins), temp_pdf_1(nbins), temp_pdf_2(nbins);
+
+    for(int i=0; i<input.size(); ++i)
+    {
+        vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), input[i]);
+        cdf_1[i] = breaks.begin() - low;
+    }
+
+    int first_size = round((double)(input_size*p));
+    double bin_width = breaks[1] - breaks[0];
+
+    cdf_2 = cdf_1;
+    pdf_1 = cdf_1;
+    pdf_2 = cdf_1;
+    double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
+    double dup_sum_ez = 0.0;
+    for(int j=0; j<ez.size(); ++j)
+    {
+        dup_sum_ez = dup_sum_ez + (1.0 - ez[j]);
+    }
+
+    for(int k=0; k<breaks.size(); ++k)
+    {
+        double sum_1 = 0.0;
+        double sum_2 = 0.0;
+        for(int m=0; m<cdf_1.size(); ++m)
+        {
+            if(cdf_1[m] == (double)m)
+            {
+                sum_1 = sum_1 + ez[m];
+                sum_2 = sum_2 + (1.0 - ez[m]);
+            }
+        }
+        temp_pdf_1[k-1] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (input_size + 50) / (input_size + 51);
+        temp_pdf_2[k-1] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (input_size + 50) / (input_size  + 51);
+
+        replace(pdf_1.begin(), pdf_1.end(), (double)k, temp_pdf_1[k-1]);
+        replace(pdf_2.begin(), pdf_2.end(), (double)k, temp_pdf_2[k-1]);
+
+        temp_cdf_1[k-1] = temp_pdf_1[k-1] * bin_width;
+        temp_cdf_2[k-1] = temp_pdf_2[k-1] * bin_width;
+    }
+    vector<double> new_cdf_1(input.size()), new_cdf_2(input.size());
+    prescan(temp_cdf_1, new_cdf_1);
+    prescan(temp_cdf_2, new_cdf_2);
+
+    for(int l=0; l<input.size(); ++l)
+    {
+        int index_1 = lroundf(cdf_1[l]);
+        int index_2 = lroundf(cdf_2[l]);
+
+        double td_1 = new_cdf_1[index_1-1];
+        double td_2 = new_cdf_2[index_2-1];
+
+        double pf_1 = pdf_1[index_1-1];
+        double pf_2 = pdf_2[index_2-1];
+
+        cdf_1[l] = td_1 + pf_1*(input[l]-breaks[index_1-1]);
+        cdf_2[l] = td_2 + pf_2*(input[l]-breaks[index_2-1]);
+    }
 }
 
 template <typename V, typename T, typename P, typename R>
@@ -226,7 +322,7 @@ void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho,
 template <typename V, typename T>
 void em_gaussian(V& x, V& y, T& idrLocal)
 {
-    typedef typename V::value_type ValueType;
+    typedef typename T::value_type ValueType;
 
     vector<ValueType> ez( x.size() );
     vector<ValueType> breaks(51);
@@ -247,8 +343,8 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     breaks[0] = (double)1-bin_width/100;
     iota(breaks.begin(), breaks.end(), (double)(x.size()-1+bin_width/50)/50);
 
-    vector<double> x1_pdf, x2_pdf, x1_cdf, x2_cdf;
-    vector<double> y1_pdf, y2_pdf, y1_cdf, y2_cdf;
+    vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
+    vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
 
     mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
         x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
