@@ -247,35 +247,41 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
 
     for(int i=0; i<input.size(); ++i)
     {
-        vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), input[i]);
-        cdf_1[i] = breaks.begin() - low;
+        vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), (double)input[i]);
+        cdf_1[i] = low - breaks.begin();
     }
 
+    //std::copy(cdf_1.begin(), cdf_1.end(), std::ostream_iterator<double>(std::cout, " "));
+    printf("%f\n", accumulate(cdf_1.begin(), cdf_1.end(), 0.0));
     int first_size = round((double)(input_size*p));
     double bin_width = breaks[1] - breaks[0];
 
     cdf_2 = cdf_1;
     pdf_1 = cdf_1;
     pdf_2 = cdf_1;
+
     double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
     double dup_sum_ez = 0.0;
+
     for(int j=0; j<ez.size(); ++j)
     {
         dup_sum_ez = dup_sum_ez + (1.0 - ez[j]);
     }
 
-    for(int k=0; k<breaks.size(); ++k)
+    for(int k=1; k<breaks.size(); ++k)
     {
         double sum_1 = 0.0;
         double sum_2 = 0.0;
         for(int m=0; m<cdf_1.size(); ++m)
         {
-            if(cdf_1[m] == (double)m)
+            if(cdf_1[m] == k)
             {
                 sum_1 = sum_1 + ez[m];
                 sum_2 = sum_2 + (1.0 - ez[m]);
             }
         }
+        //printf("%f - %f\n", sum_1, sum_2);
+
         temp_pdf_1[k-1] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (input_size + 50) / (input_size + 51);
         temp_pdf_2[k-1] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (input_size + 50) / (input_size  + 51);
 
@@ -285,6 +291,7 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
         temp_cdf_1[k-1] = temp_pdf_1[k-1] * bin_width;
         temp_cdf_2[k-1] = temp_pdf_2[k-1] * bin_width;
     }
+    printf("\n\n\n\n");
     vector<double> new_cdf_1(input.size()), new_cdf_2(input.size());
     prescan(temp_cdf_1, new_cdf_1);
     prescan(temp_cdf_2, new_cdf_2);
@@ -340,25 +347,35 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     double eps = 0.01;
 
     vector<double> likelihood;
-    breaks[0] = (double)1-bin_width/100;
-    iota(breaks.begin(), breaks.end(), (double)(x.size()-1+bin_width/50)/50);
 
+    for(int i=0; i<breaks.size(); ++i)
+    {
+        if (i == 0)
+        {
+            breaks[i] = (double)1-bin_width/100;
+        }
+        else
+        {
+            breaks[i] = breaks[i-1] + (double)(x.size()-1+bin_width/50)/50;
+        }
+    }
     vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
     vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
 
+    printf("Initialising the marginals\n");
     mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
         x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
-
     double li = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
-            y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
-
+        y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
     likelihood.push_back(li);
+    printf("    Done - %f\n", li);
 
     bool flag = true;
     int i = 1;
 
     //can do better. Jus replicating IDR R style coding
     int iter_counter = 1;
+    printf("Starting the loop\n");
     while(flag)
     {
         estep_gaussian(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
@@ -381,6 +398,7 @@ void em_gaussian(V& x, V& y, T& idrLocal)
         }
         i++;
         iter_counter++;
+        printf("Loop iteration - %d\n", i);
     }
 }
 
