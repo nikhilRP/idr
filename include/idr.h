@@ -214,28 +214,6 @@ void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     density_c1.shrink_to_fit();
 }
 
-template <typename V>
-void prescan(V& x, V& y)
-{
-    int n=sizeof(x)/sizeof(double);
-    for (int i=0;i<=(log(n)-1);i++)
-    {
-        for (int j=0;j<=n-1;j++)
-        {
-            y[j] = x[j];
-            if (j>=(powf(2,i)))
-            {
-                int t=powf(2,i);
-                y[j] += x[j-t];
-            }
-        }
-        for (int j=0;j<=n-1;j++)
-        {
-            x[j] = y[j];
-        }
-    }
-}
-
 template <typename V, typename T>
 void estimate_marginals(V& input, T& breaks, T& pdf_1,
     T& pdf_2, T& cdf_1, T& cdf_2, T& ez, double p)
@@ -250,10 +228,6 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
         vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), (double)input[i]);
         cdf_1[i] = low - breaks.begin();
     }
-
-    //Debug statements
-    //std::copy(cdf_1.begin(), cdf_1.end(), std::ostream_iterator<double>(std::cout, " "));
-    //printf("%f\n", accumulate(cdf_1.begin(), cdf_1.end(), 0.0));
 
     int first_size = round((double)(input_size*p));
     double bin_width = breaks[1] - breaks[0];
@@ -304,35 +278,26 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
         new_cdf_1[p] = temp_cdf_1[p-1] + new_cdf_1[p-1];
         new_cdf_2[p] = temp_cdf_2[p-1] + new_cdf_2[p-1];
     }
-    printf("%f\n", accumulate(new_cdf_1.begin(), new_cdf_1.end(), 0.0));
 
     for(int l=0; l<input.size(); ++l)
     {
-        int index_1 = lroundf(cdf_1[l]);
-        int index_2 = lroundf(cdf_2[l]);
-
-        double td_1 = new_cdf_1[index_1-1];
-        double td_2 = new_cdf_2[index_2-1];
-
-        double pf_1 = pdf_1[index_1-1];
-        double pf_2 = pdf_2[index_2-1];
-
-        cdf_1[l] = td_1 + pf_1*(input[l]-breaks[index_1-1]);
-        cdf_2[l] = td_2 + pf_2*(input[l]-breaks[index_2-1]);
+        int i = lroundf(cdf_1[l]);
+        double b = input[l] - breaks[i-1];
+        cdf_1[l] = new_cdf_1[i-1] + temp_pdf_1[i-1] * b;
+        cdf_2[l] = new_cdf_2[i-1] + temp_pdf_2[i-1] * b;
     }
 }
 
 template <typename V, typename T, typename P, typename R>
-void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho,
-    T& x1_pdf, T& x2_pdf, T& x1_cdf, T& x2_cdf, T& y1_pdf,
-    T& y2_pdf, T& y1_cdf, T& y2_cdf, T& ez)
+void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho, T& x1_pdf, T& x2_pdf,
+    T& x1_cdf, T& x2_cdf, T& y1_pdf, T& y2_pdf, T& y1_cdf, T& y2_cdf, T& ez)
 {
     estimate_marginals(x, breaks, x1_pdf, x2_pdf, x1_cdf, x2_cdf, ez, *p0);
     estimate_marginals(y, breaks, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, *p0);
 
     *rho = maximum_likelihood(x1_cdf, y1_cdf, ez);
 
-    double sum_ez = accumulate(ez.begin(), ez.end(), 0.0) / x.size();
+    double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
     *p0 = sum_ez/(double)x.size();
 }
 
@@ -372,7 +337,7 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
     vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
 
-    printf("Initialising the marginals\n");
+    printf("    Initialising the marginals\n");
 
     mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
         x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
@@ -381,15 +346,13 @@ void em_gaussian(V& x, V& y, T& idrLocal)
         y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
 
     likelihood.push_back(li);
-
-    printf("    Done - %f\n", li);
+    printf("    Done\n");
 
     bool flag = true;
     int i = 1;
 
     //can do better. Jus replicating IDR R style coding
     int iter_counter = 1;
-    printf("Starting the loop\n");
     while(flag)
     {
         estep_gaussian(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
@@ -412,9 +375,15 @@ void em_gaussian(V& x, V& y, T& idrLocal)
         }
         i++;
         iter_counter++;
-        printf("Loop iteration - %d\n", i);
+    }
+    printf("Finished running IDR on the datasets\n");
+    printf("Final P value = %.15g\n", p0);
+    printf("Final rho value = %.15g\n", rho);
+    printf("Total iterations of EM - %d\n", iter_counter-1);
+    for(int i=0; i<ez.size(); ++i)
+    {
+        idrLocal[i] = (double)1.0 - ez[i];
     }
 }
-
 #endif
 

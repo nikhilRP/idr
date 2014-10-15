@@ -181,11 +181,22 @@ int main(int argc, char* argv[])
         }
 
         fprintf(stderr, "Number of overlaps after removing duplicates - %lu\n", unmatched_merge_A.size());
+        fprintf(stderr, "Ranking overlaps\n");
+
         vector<int> ranks_A, ranks_B;
         rank_vec(unmatched_merge_A, ranks_A, "average");
         rank_vec(unmatched_merge_B, ranks_B, "average");
         vector<double> idrLocal( ranks_A.size() );
+
+        fprintf(stderr, "   Done\n");
+        fprintf(stderr, "Fit 2-component model - started\n");
+
         em_gaussian(ranks_A, ranks_B, idrLocal);
+        vector<double> positions(idrLocal.size());
+        iota(positions.begin(), positions.end(), 1.0);
+        vector<double> temp = positions;
+
+
         return 0;
     }
     else {
