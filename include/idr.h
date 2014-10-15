@@ -217,7 +217,7 @@ void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
 template <typename V>
 void prescan(V& x, V& y)
 {
-    int n=sizeof(x)/sizeof(int);
+    int n=sizeof(x)/sizeof(double);
     for (int i=0;i<=(log(n)-1);i++)
     {
         for (int j=0;j<=n-1;j++)
@@ -251,8 +251,10 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
         cdf_1[i] = low - breaks.begin();
     }
 
+    //Debug statements
     //std::copy(cdf_1.begin(), cdf_1.end(), std::ostream_iterator<double>(std::cout, " "));
-    printf("%f\n", accumulate(cdf_1.begin(), cdf_1.end(), 0.0));
+    //printf("%f\n", accumulate(cdf_1.begin(), cdf_1.end(), 0.0));
+
     int first_size = round((double)(input_size*p));
     double bin_width = breaks[1] - breaks[0];
 
@@ -280,7 +282,6 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
                 sum_2 = sum_2 + (1.0 - ez[m]);
             }
         }
-        //printf("%f - %f\n", sum_1, sum_2);
 
         temp_pdf_1[k-1] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (input_size + 50) / (input_size + 51);
         temp_pdf_2[k-1] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (input_size + 50) / (input_size  + 51);
@@ -291,10 +292,19 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
         temp_cdf_1[k-1] = temp_pdf_1[k-1] * bin_width;
         temp_cdf_2[k-1] = temp_pdf_2[k-1] * bin_width;
     }
-    printf("\n\n\n\n");
-    vector<double> new_cdf_1(input.size()), new_cdf_2(input.size());
-    prescan(temp_cdf_1, new_cdf_1);
-    prescan(temp_cdf_2, new_cdf_2);
+
+    vector<double> new_cdf_1(temp_cdf_1.size()), new_cdf_2(temp_cdf_2.size());
+
+    new_cdf_1[0] = 0.0;
+    new_cdf_2[0] = 0.0;
+
+    // Naive sequential scan
+    for(int p=1; p<temp_cdf_1.size(); ++p)
+    {
+        new_cdf_1[p] = temp_cdf_1[p-1] + new_cdf_1[p-1];
+        new_cdf_2[p] = temp_cdf_2[p-1] + new_cdf_2[p-1];
+    }
+    printf("%f\n", accumulate(new_cdf_1.begin(), new_cdf_1.end(), 0.0));
 
     for(int l=0; l<input.size(); ++l)
     {
@@ -363,11 +373,15 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
 
     printf("Initialising the marginals\n");
+
     mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
         x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
+
     double li = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
         y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
+
     likelihood.push_back(li);
+
     printf("    Done - %f\n", li);
 
     bool flag = true;

@@ -182,8 +182,8 @@ int main(int argc, char* argv[])
 
         fprintf(stderr, "Number of overlaps after removing duplicates - %lu\n", unmatched_merge_A.size());
         vector<int> ranks_A, ranks_B;
-        rank_vec(unmatched_merge_A, ranks_A, "default");
-        rank_vec(unmatched_merge_B, ranks_B, "default");
+        rank_vec(unmatched_merge_A, ranks_A, "average");
+        rank_vec(unmatched_merge_B, ranks_B, "average");
         vector<double> idrLocal( ranks_A.size() );
         em_gaussian(ranks_A, ranks_B, idrLocal);
         return 0;
