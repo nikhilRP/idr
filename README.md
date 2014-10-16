@@ -47,8 +47,8 @@ Sample idr run using test peak files in the repo
 
 The main contributors of IDR-GPU code:
 
-  * Nikhil R Podduturi  - J. Michael Cherry Lab, Department of Genetics, Stanford University School of Medicine
-  * J. Seth Strattan    - J. Michael Cherry Lab, Department of Genetics, Stanford University School of Medicine
+  * Nikhil R Podduturi  - J. Michael Cherry Lab, Dept. of Genetics, Stanford University School of Medicine
+  * J. Seth Strattan    - J. Michael Cherry Lab, Dept. of Genetics, Stanford University School of Medicine
   * Anshul Kundaje      - Assistant Professor, Dept. of Genetics, Stanford University
   
 
