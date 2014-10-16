@@ -30,7 +30,7 @@ Eg: `build` directory from above
 List all the options
  
 ```
-./idr --help
+./idr
 ```
 
 Sample idr run using test peak files in the repo
