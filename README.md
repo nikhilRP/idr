@@ -39,6 +39,10 @@ Sample idr run using test peak files in the repo
 ./idr -a ../idr/test/data/peak1 -b ../idr/test/data/peak2 -g ../idr/test/data/genome_table.txt
 ```
 
+### Usage
+
+[Bedtools2](https://github.com/arq5x/bedtools2) are used to parse the peak files 
+
 The main contributors of IDR-GPU code:
 
   * Nikhil R Podduturi  - nikhilrp@stanford.edu
