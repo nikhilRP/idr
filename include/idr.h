@@ -189,9 +189,6 @@ double gaussian_loglikelihood(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     {
         l0 = l0 + log(p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1.0 - p) * 1.0 * x2_pdf[i] * y2_pdf[i]);
     }
-
-    density_c1.clear();
-    density_c1.shrink_to_fit();
     return l0;
 }
 
@@ -209,9 +206,6 @@ void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     {
         ez[i] = p * density_c1[i] * x1_pdf[i] * y1_pdf[i] / (p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1-p) * 1 * x2_pdf[i] * y2_pdf[i]);
     }
-
-    density_c1.clear();
-    density_c1.shrink_to_fit();
 }
 
 template <typename V, typename T>
