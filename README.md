@@ -41,7 +41,7 @@ Sample idr run using test peak files in the repo
 
 ### Usage
 
-[Bedtools2](https://github.com/arq5x/bedtools2) are used to parse the peak files 
+[bedtools2](https://github.com/arq5x/bedtools2) are used to parse the peak files 
 
 The main contributors of IDR-GPU code:
 
