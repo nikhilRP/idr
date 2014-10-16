@@ -24,7 +24,8 @@ using namespace std;
 void ShowHelp(void);
 
 // Utility struct to keep track of final results
-struct overlap {
+struct overlap
+{
     string chr;
     CHRPOS start1;
     CHRPOS end1;
@@ -34,6 +35,14 @@ struct overlap {
     double rankingMeasure2;
     double idrLocal;
     double idr;
+};
+
+struct sort_pred
+{
+    bool operator()(const std::pair<int, double> &left, const std::pair<int, double> &right)
+    {
+        return left.second < right.second;
+    }
 };
 
 int main(int argc, char* argv[])
@@ -48,6 +57,7 @@ int main(int argc, char* argv[])
     bool haveBedA = false;
     bool haveBedB = false;
     bool haveGenome = false;
+    float idrCutoff = 0.025;
 
     if(argc <= 1) showHelp = true;
 
@@ -87,6 +97,12 @@ int main(int argc, char* argv[])
         else if(PARAMETER_CHECK("-rank", 5, parameterLength)) {
             if((i+1) < argc) {
                 rankingMeasure = argv[i + 1];
+                i++;
+            }
+        }
+        else if(PARAMETER_CHECK("-idr", 5, parameterLength)) {
+            if((i+1) < argc) {
+                idrCutoff = atof(argv[i + 1]);
                 i++;
             }
         }
@@ -186,17 +202,59 @@ int main(int argc, char* argv[])
         vector<int> ranks_A, ranks_B;
         rank_vec(unmatched_merge_A, ranks_A, "average");
         rank_vec(unmatched_merge_B, ranks_B, "average");
-        vector<double> idrLocal( ranks_A.size() );
+        vector< pair<int, double> > idr(ranks_A.size());
+        vector<double> idrLocal(ranks_A.size());
 
         fprintf(stderr, "   Done\n");
         fprintf(stderr, "Fit 2-component model - started\n");
 
-        em_gaussian(ranks_A, ranks_B, idrLocal);
-        vector<double> positions(idrLocal.size());
-        iota(positions.begin(), positions.end(), 1.0);
-        vector<double> temp = positions;
+        em_gaussian(ranks_A, ranks_B, idr);
+        for(int i=0; i<idr.size(); ++i)
+        {
+            idrLocal[i] = idr[i].second;
+        }
 
+        sort(idr.begin(), idr.end(), sort_pred());
+        for(int i=1; i<idr.size(); ++i)
+        {
+            idr[i].second = idr[i].second + idr[i-1].second;
+        }
 
+        int counter = 0;
+        for(int j=0; j<ranks_A.size(); ++j)
+        {
+            double a = (double)j;
+            idr[j].second = idr[j].second/a;
+            if(idr[j].second <= idrCutoff)
+            {
+                counter++;
+            }
+        }
+        sort(idr.begin(), idr.end());
+        
+        std::filebuf fb;
+        fb.open ("idrValues.txt",std::ios::out);
+        std::ostream fout(&fb);
+        fout.precision(15);
+        for (unsigned int i=0; i < idr.size(); ++i)
+        {
+            overlaps[i].idrLocal = idrLocal[i];
+            overlaps[i].idr = idr[i].second;
+            if (overlaps[i].idr <= idrCutoff)
+            {
+                fout<<overlaps[i].chr<<"\t"<<
+                    overlaps[i].start1<<"\t"<<
+                    overlaps[i].end1<<"\t"<<
+                    overlaps[i].rankingMeasure1<<"\t"<<
+                    overlaps[i].start2<<"\t"<<
+                    overlaps[i].end2<<"\t"<<
+                    overlaps[i].rankingMeasure2<<"\t"<<
+                    std::fixed<<overlaps[i].idrLocal<<"\t"<<
+                    std::fixed<<overlaps[i].idr<<endl;
+            }
+        }
+        fb.close();
+        fprintf(stderr, "Number of peaks passing IDR cutoff of %f - %d\n", idrCutoff, counter);
         return 0;
     }
     else {

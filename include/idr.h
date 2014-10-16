@@ -304,10 +304,8 @@ void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho, T& x1_pdf, T& x2_pdf,
 template <typename V, typename T>
 void em_gaussian(V& x, V& y, T& idrLocal)
 {
-    typedef typename T::value_type ValueType;
-
-    vector<ValueType> ez( x.size() );
-    vector<ValueType> breaks(51);
+    vector<double> ez( x.size() );
+    vector<double> breaks(51);
 
     int mid = round((float) x.size()/2);
 
@@ -380,9 +378,12 @@ void em_gaussian(V& x, V& y, T& idrLocal)
     printf("Final P value = %.15g\n", p0);
     printf("Final rho value = %.15g\n", rho);
     printf("Total iterations of EM - %d\n", iter_counter-1);
+    vector<double> temp(ez.size());
     for(int i=0; i<ez.size(); ++i)
     {
-        idrLocal[i] = (double)1.0 - ez[i];
+        double a = 1.0;
+        idrLocal[i].first = i+1;
+        idrLocal[i].second = a-ez[i];
     }
 }
 #endif

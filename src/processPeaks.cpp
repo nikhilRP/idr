@@ -252,6 +252,4 @@ void ProcessPeaks::FindOverlaps() {
             B.size(),
             &overlap_index_A,
             &overlap_index_B);
-
-    fprintf( stderr, "Overlaps found among peak files - %d\n", tot_overlaps );
 }
