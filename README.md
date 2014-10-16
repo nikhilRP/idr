@@ -8,7 +8,7 @@ Irreproducible Discovery Rate for high throughput ChiP-seq experiments
 
 * Get the current repo
 ```
-git clone --recursive https://github.com/ENCODE-DCC/idr-GPU.git
+git clone --recursive https://github.com/nikhilRP/idr.git
 ```
 * Create a directory parallel to the repo (eg: build)
 ```
@@ -36,7 +36,7 @@ List all the options
 Sample idr run using test peak files in the repo
 
 ```
-./idr -a ../idr/test/data/peak1 -b ../idr/test/data/peak2 -g ../idr/test/data/genome_table.txt -idr 0.03
+./idr -a ../idr/test/data/peak1 -b ../idr/test/data/peak2 -g ../idr/test/data/genome_table.txt
 ```
 
 The main contributors of IDR-GPU code:
