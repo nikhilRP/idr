@@ -4,7 +4,8 @@ before_script:
     - pwd
     - which sh
 
-script: "cd test && sh ./.travis_build.sh"
+script:
+    "cd test && sh ./.travis_build.sh"
 
 branches:
     only:
