@@ -497,11 +497,6 @@ private:
             if (this->bedType == 10) {
                 bed.pointSource = atoi(lineVector[9].c_str());
             }
-            else {
-                cerr << "Error: unexpected number of fields at line: " << lineNum
-                     << ".  Verify that your files are TAB-delimited.  Exiting..." << endl;
-                exit(1);
-            }
 
             // sanity checks.
             if (bed.start <= bed.end) {
