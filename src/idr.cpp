@@ -96,11 +96,14 @@ int main(int argc, char* argv[])
         }
         else if(PARAMETER_CHECK("-rank", 5, parameterLength)) {
             if((i+1) < argc) {
-                rankingMeasure = argv[i + 1];
+                if (strcmp( argv[i+1], "p.value" ) == 0)
+                    rankingMeasure = "pValue";
+                else if (strcmp( argv[i+1], "q.value" ) == 0)
+                    rankingMeasure = "qValue";
                 i++;
             }
         }
-        else if(PARAMETER_CHECK("-idr", 5, parameterLength)) {
+        else if(PARAMETER_CHECK("-idr", 4, parameterLength)) {
             if((i+1) < argc) {
                 idrCutoff = atof(argv[i + 1]);
                 i++;
@@ -231,7 +234,7 @@ int main(int argc, char* argv[])
             }
         }
         sort(idr.begin(), idr.end());
-        
+
         std::filebuf fb;
         fb.open ("idrValues.txt",std::ios::out);
         std::ostream fout(&fb);
