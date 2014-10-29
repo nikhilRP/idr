@@ -66,7 +66,7 @@ void ShowHelp(void) {
     fprintf(stderr,
         "   -idr        IDR cutoff (default: %e)\n\n", DEFAULT_IDR_CUTOFF);
     fprintf(stderr,
-        "   -rank       Type of ranking measure (default: %s)\n\n",
+        "   -rank       Type of ranking measure (default: %s, other options: p.value, q.value)\n\n",
         DEFAULT_RANKING_MEASURE);
     exit(1);
 }
