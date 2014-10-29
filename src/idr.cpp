@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
+#include <cerrno>
 
 #include <processPeaks.h>
 #include <ranker.h>
