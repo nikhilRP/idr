@@ -8,9 +8,3 @@ include_directories(
 )
 
 add_executable(../idr ${IDR_SRC_FILES})
-
-find_package(ZLIB)
-if (ZLIB_FOUND)
-    include_directories(${ZLIB_INCLUDE_DIRS})
-    target_link_libraries(../idr ${ZLIB_LIBRARIES})
-endif()

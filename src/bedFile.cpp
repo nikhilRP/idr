@@ -10,8 +10,6 @@
   Licensed under the GNU General Public License 2.0 license.
 ******************************************************************************/
 #include "bedFile.h"
-#include "gzstream.h"
-#include "fileType.h"
 
 /***********************************************
 Sorting comparison functions
@@ -111,10 +109,11 @@ void BedFile::Open(void) {
     else {
         _bedStream = new ifstream(bedFile.c_str(), ios::in);
 
-        if( isGzipFile(_bedStream) ) {
+        // Integrate unzip later
+        /*if( isGzipFile(_bedStream) ) {
             delete _bedStream;
             _bedStream = new igzstream(bedFile.c_str(), ios::in);
-        }
+        }*/
         if ( _bedStream->fail() ) {
             cerr << "Error: The requested file ("
                  << bedFile
