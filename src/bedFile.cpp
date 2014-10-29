@@ -10,6 +10,7 @@
   Licensed under the GNU General Public License 2.0 license.
 ******************************************************************************/
 #include "bedFile.h"
+#include <errno.h>
 
 /***********************************************
 Sorting comparison functions
