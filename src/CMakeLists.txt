@@ -1,5 +1,5 @@
 # Build steps
-file(GLOB_RECURSE IDR_SRC_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
+file(GLOB_RECURSE IDR_SRC_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp *.C)
 
 add_library(${MYLIB_NAME} STATIC ${IDR_SRC_FILES})
 add_library(${MYLIB_NAME}Shared SHARED ${IDR_SRC_FILES})
@@ -8,3 +8,9 @@ include_directories(
 )
 
 add_executable(../idr ${IDR_SRC_FILES})
+
+find_package(ZLIB)
+if (ZLIB_FOUND)
+    include_directories(${ZLIB_INCLUDE_DIRS})
+    target_link_libraries(../idr ${ZLIB_LIBRARIES})
+endif()

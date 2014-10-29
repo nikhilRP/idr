@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
 
     if (!showHelp) {
         ProcessPeaks *bc = new ProcessPeaks(bedAFile, bedBFile, genomeFile);
-        vector<double> merge_A, merge_B, unmatched_merge_A, unmatched_merge_B;
+        /*vector<double> merge_A, merge_B, unmatched_merge_A, unmatched_merge_B;
         vector<unsigned int> tracker;
         vector<overlap> overlaps;
 
@@ -257,7 +257,7 @@ int main(int argc, char* argv[])
             }
         }
         fb.close();
-        fprintf(stderr, "Number of peaks passing IDR cutoff of %f - %d\n", idrCutoff, counter);
+        fprintf(stderr, "Number of peaks passing IDR cutoff of %f - %d\n", idrCutoff, counter);*/
         return 0;
     }
     else {
