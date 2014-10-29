@@ -174,11 +174,11 @@ build_ranks_vector( ProcessPeaks *bc,
 
     unsigned int start = 0;
     for (size_t i = 0; i < bc->_peakA->bedList.size(); ++i) {
-        merge_A.push_back(stod(bc->_peakA->bedList[i].fields[rankingMeasure]));
+        merge_A.push_back(atof(bc->_peakA->bedList[i].fields[rankingMeasure].c_str()));
         merge_B.push_back(0);
         while (start < bc->overlap_index_A[i]) {
             tracker.push_back( bc->overlap_index_B[start] );
-            double bSigVal = stod(bc->_peakB->bedList[bc->overlap_index_B[start] ].fields[rankingMeasure]);
+            double bSigVal = atof(bc->_peakB->bedList[bc->overlap_index_B[start] ].fields[rankingMeasure].c_str());
 
             overlap o;
             string chr(bc->_peakA->bedList[i].chrom);
@@ -206,7 +206,7 @@ build_ranks_vector( ProcessPeaks *bc,
     sort(tracker.begin(), tracker.end());
     for (unsigned int i = 0; i < bc->_peakB->bedList.size(); ++i) {
         if(find(tracker.begin(), tracker.end(), i) == tracker.end()) {
-            double bSigVal = stod(bc->_peakB->bedList[i].fields[rankingMeasure]);
+            double bSigVal = atof(bc->_peakB->bedList[i].fields[rankingMeasure].c_str());
             merge_A.push_back( 0 );
             merge_B.push_back( bSigVal );
         }
