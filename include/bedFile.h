@@ -502,10 +502,6 @@ private:
             if (bed.start <= bed.end) {
                 return true;
             }
-            else {
-                cerr << "Error: malformed BED entry at line " << lineNum << ". Start was greater than end. Exiting." << endl;
-                exit(1);
-            }
         }
         else if (numFields == 1) {
             cerr << "Only one BED field detected: " << lineNum << ".  Verify that your files are TAB-delimited.  Exiting..." << endl;
