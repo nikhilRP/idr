@@ -153,7 +153,7 @@ class Args {
                 ShowHelp();
             }
         }
-        // make sure we have both input files
+        // make sure we have all the input files
         if (!haveBedA || !haveBedB || !haveGenome) {
             fprintf(stderr, "*****ERROR: Need -a, -b and  -g files. *****");
             ShowHelp();
@@ -189,6 +189,11 @@ build_ranks_vector( ProcessPeaks *bc,
             o.start2 = bc->_peakB->bedList[ bc->overlap_index_B[start] ].start;
             o.end2 = bc->_peakB->bedList[ bc->overlap_index_B[start] ].end;
 
+            /*
+             * If a peak in A overlaps with multiple
+             * peaks in B, then average of the ranking
+             * measure in peaks in B taken into account
+             */
             if (merge_B[i] == 0) {
                 merge_B[i] = bSigVal;
                 o.rankingMeasure2 = merge_B[i];

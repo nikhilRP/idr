@@ -13,6 +13,7 @@
 #include <float.h>
 #include <numeric>
 
+using namespace std;
 
 double RationalApproximation(double t)
 {
@@ -37,8 +38,9 @@ double NormalCDFInverse(double p)
     }
 }
 
-template <typename V>
-void calculate_quantiles(V& x_cdf, V& y_cdf, V& density, double rho)
+void calculate_quantiles(
+		vector<double>& x_cdf, vector<double>& y_cdf,
+		vector<double>& density, double rho)
 {
     for(int i=0; i<x_cdf.size(); ++i)
     {
@@ -48,17 +50,17 @@ void calculate_quantiles(V& x_cdf, V& y_cdf, V& density, double rho)
     }
 }
 
-template <typename V>
-double cost_function(V& x_cdf, V& y_cdf, V& ez, double rho)
+double cost_function(
+		vector<double>& x_cdf, vector<double>& y_cdf,
+		vector<double>& ez, double rho)
 {
-    typedef typename V::value_type ValueType;
 
-    vector<ValueType> density(x_cdf.size());
-    vector<ValueType> new_density(x_cdf.size());
+    vector<double> density(x_cdf.size());
+    vector<double> new_density(x_cdf.size());
 
     calculate_quantiles(x_cdf, y_cdf, density, rho);
 
-    ValueType cop_den = 0.0;
+    double cop_den = 0.0;
     for(int i=0; i<density.size(); ++i)
     {
         cop_den = cop_den + (ez[i] * log(density[i]));
@@ -66,11 +68,11 @@ double cost_function(V& x_cdf, V& y_cdf, V& ez, double rho)
     return -cop_den;
 }
 
-template <typename V>
-double maximum_likelihood(V& x_cdf, V& y_cdf, V& ez)
+double maximum_likelihood(
+		vector<double>& x_cdf,
+		vector<double>& y_cdf,
+		vector<double>& ez)
 {
-    typedef typename V::value_type ValueType;
-
     double ax = -0.998;
     double bx = 0.998;
     double tol = 0.00001;
@@ -174,16 +176,16 @@ double maximum_likelihood(V& x_cdf, V& y_cdf, V& ez)
     return x;
 }
 
-template <typename V>
-double gaussian_loglikelihood(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
-        V& y1_pdf, V& y2_pdf, V& y1_cdf, V& y2_cdf, double p, double rho)
+double gaussian_loglikelihood(
+		vector<double>& x1_pdf, vector<double>& x2_pdf,
+		vector<double>& x1_cdf, vector<double>& x2_cdf,
+		vector<double>& y1_pdf, vector<double>& y2_pdf,
+		vector<double>& y1_cdf, vector<double>& y2_cdf,
+		double p, double rho)
 {
-    typedef typename V::value_type ValueType;
-
-    vector<ValueType> density_c1( x1_pdf.size() );
+    vector<double> density_c1( x1_pdf.size() );
     double l0 = 0.0;
 
-    // rewrite this
     calculate_quantiles(x1_cdf, y1_cdf, density_c1, rho);
     for(int i=0; i<density_c1.size(); ++i)
     {
@@ -192,15 +194,15 @@ double gaussian_loglikelihood(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     return l0;
 }
 
-template <typename V>
-void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
-        V& y1_pdf, V& y2_pdf, V& y1_cdf, V& y2_cdf, V& ez, double p, double rho)
+void estep_gaussian(
+		vector<double>& x1_pdf, vector<double>& x2_pdf,
+		vector<double>& x1_cdf, vector<double>& x2_cdf,
+		vector<double>& y1_pdf, vector<double>& y2_pdf,
+		vector<double>& y1_cdf, vector<double>& y2_cdf,
+		vector<double>& ez, double p, double rho)
 {
-    typedef typename V::value_type ValueType;
+    vector<double> density_c1( x1_pdf.size() );
 
-    vector<ValueType> density_c1( x1_pdf.size() );
-
-    // Rewrite those GPU kernals
     calculate_quantiles(x1_cdf, y1_cdf, density_c1, rho);
     for(int i=0; i<ez.size(); ++i)
     {
@@ -208,9 +210,11 @@ void estep_gaussian(V& x1_pdf, V& x2_pdf, V& x1_cdf, V& x2_cdf,
     }
 }
 
-template <typename V, typename T>
-void estimate_marginals(V& input, T& breaks, T& pdf_1,
-    T& pdf_2, T& cdf_1, T& cdf_2, T& ez, double p)
+void estimate_marginals(
+		vector<float>& input, vector<double>& breaks,
+		vector<double>& pdf_1, vector<double>& pdf_2,
+		vector<double>& cdf_1, vector<double>& cdf_2,
+		vector<double>& ez, double p)
 {
     int nbins = breaks.size() - 1;
     int input_size = input.size();
@@ -219,7 +223,7 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
 
     for(int i=0; i<input.size(); ++i)
     {
-        vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), (double)input[i]);
+        std::vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), (double)input[i]);
         cdf_1[i] = low - breaks.begin();
     }
 
@@ -282,9 +286,14 @@ void estimate_marginals(V& input, T& breaks, T& pdf_1,
     }
 }
 
-template <typename V, typename T, typename P, typename R>
-void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho, T& x1_pdf, T& x2_pdf,
-    T& x1_cdf, T& x2_cdf, T& y1_pdf, T& y2_pdf, T& y1_cdf, T& y2_cdf, T& ez)
+void mstep_gaussian(
+		vector<float>& x, vector<float> y,
+		vector<double>& breaks, double* p0, double* rho,
+		vector<double>& x1_pdf, vector<double>& x2_pdf,
+		vector<double>& x1_cdf, vector<double>& x2_cdf,
+		vector<double>& y1_pdf, vector<double>& y2_pdf,
+		vector<double>& y1_cdf, vector<double>& y2_cdf,
+		vector<double>& ez)
 {
     estimate_marginals(x, breaks, x1_pdf, x2_pdf, x1_cdf, x2_cdf, ez, *p0);
     estimate_marginals(y, breaks, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, *p0);
@@ -295,11 +304,12 @@ void mstep_gaussian(V& x, V& y, T& breaks, P *p0,  R *rho, T& x1_pdf, T& x2_pdf,
     *p0 = sum_ez/(double)x.size();
 }
 
-template <typename V, typename T>
-void em_gaussian(V& x, V& y, T& idrLocal)
+
+void em_gaussian(
+		vector<float>& x, vector<float>& y,
+		vector< pair<int, double> >& idrLocal)
 {
     vector<double> ez( x.size() );
-    vector<double> breaks(51);
 
     int mid = round((float) x.size()/2);
 
@@ -308,13 +318,12 @@ void em_gaussian(V& x, V& y, T& idrLocal)
 
     float bin_width = (float)(x.size()-1)/50;
 
-    // Constants chosen by Li and Anshul
     double p0 = 0.5;
     double rho = 0.0;
     double eps = 0.01;
 
-    vector<double> likelihood;
-
+    /* Breaks for binning the data */
+    vector<double> breaks(51);
     for(int i=0; i<breaks.size(); ++i)
     {
         if (i == 0)
@@ -326,24 +335,31 @@ void em_gaussian(V& x, V& y, T& idrLocal)
             breaks[i] = breaks[i-1] + (double)(x.size()-1+bin_width/50)/50;
         }
     }
+
+    /*
+     * CDF and PDF vectors for the input vectors.
+     * Updated everytime for a EM iteration.
+     */
     vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
     vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
 
-    printf("    Initialising the marginals\n");
+    fprintf(stderr, "    Initialising the marginals\n");
 
     mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
         x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
 
+    /* Likelihood vector */
+    vector<double> likelihood;
     double li = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
         y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
 
     likelihood.push_back(li);
-    printf("    Done\n");
+    fprintf(stderr, "    Done\n");
 
     bool flag = true;
     int i = 1;
 
-    //can do better. Jus replicating IDR R style coding
+    /* can do better. Jus replicating IDR R style coding */
     int iter_counter = 1;
     while(flag)
     {
@@ -359,7 +375,9 @@ void em_gaussian(V& x, V& y, T& idrLocal)
 
         if (i > 1)
         {
-            double a_cri = likelihood[i-2] + (likelihood[i-1] - likelihood[i-2])/(1-(likelihood[i]-likelihood[i-1])/(likelihood[i-1]-likelihood[i-2]));
+        	/* Aitken acceleration criterion checking for breaking the loop */
+            double a_cri = likelihood[i-2] + (likelihood[i-1] - likelihood[i-2])
+            		/ (1-(likelihood[i]-likelihood[i-1])/(likelihood[i-1]-likelihood[i-2]));
             if ( std::abs(a_cri-likelihood[i]) <= eps )
             {
                 flag = false;
@@ -368,10 +386,6 @@ void em_gaussian(V& x, V& y, T& idrLocal)
         i++;
         iter_counter++;
     }
-    printf("Finished running IDR on the datasets\n");
-    printf("Final P value = %.15g\n", p0);
-    printf("Final rho value = %.15g\n", rho);
-    printf("Total iterations of EM - %d\n", iter_counter-1);
     vector<double> temp(ez.size());
     for(int i=0; i<ez.size(); ++i)
     {
@@ -379,6 +393,10 @@ void em_gaussian(V& x, V& y, T& idrLocal)
         idrLocal[i].first = i+1;
         idrLocal[i].second = a-ez[i];
     }
+    fprintf(stderr, "Finished running IDR on the datasets\n");
+	fprintf(stderr, "Final P value = %.15g\n", p0);
+	fprintf(stderr, "Final rho value = %.15g\n", rho);
+	fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
 }
 #endif
 
