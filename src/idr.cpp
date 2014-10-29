@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
+#include <cerrno>
 
 #include <processPeaks.h>
 #include <ranker.h>
@@ -50,7 +51,8 @@ struct sort_pred
 
 #define DEFAULT_IDR_CUTOFF 0.025
 #define DEFAULT_OFNAME "idrValues.txt"
-#define DEFAULT_RANKING_MEASURE "signalValue"
+#define DEFAULT_RANKING_MEASURE "signal.value"
+#define RANKING_MEASURE_INDEX 6
 
 void ShowHelp(void) {
     fprintf(stderr, "\n");
@@ -76,13 +78,13 @@ class Args {
     string genomeFile;
 
     string ofname;
-    string rankingMeasure;
+    int rankingMeasure;
     float idrCutoff;
 
     Args( int argc, char* argv[] )
     {
         this->ofname = DEFAULT_OFNAME;
-        this->rankingMeasure = DEFAULT_RANKING_MEASURE;
+        this->rankingMeasure = RANKING_MEASURE_INDEX;
         this->idrCutoff = DEFAULT_IDR_CUTOFF;
 
         bool haveBedA = false;
@@ -132,7 +134,10 @@ class Args {
             }
             else if(PARAMETER_CHECK("-rank", 5, parameterLength)) {
                 if((i+1) < argc) {
-                    this->rankingMeasure = argv[i + 1];
+                    if (strcmp( argv[i+1], "p.value" ) == 0)
+                        rankingMeasure = 7;
+                    else if (strcmp( argv[i+1], "q.value" ) == 0)
+                        rankingMeasure = 8;
                     i++;
                 }
             }
@@ -156,9 +161,10 @@ class Args {
     };
 };
 
+
 int
 build_ranks_vector( ProcessPeaks *bc,
-                    string rankingMeasure,
+                    int rankingMeasure,
                     vector<overlap> &overlaps,
                     vector<float> &ranks_A,
                     vector<float> &ranks_B)
@@ -168,31 +174,11 @@ build_ranks_vector( ProcessPeaks *bc,
 
     unsigned int start = 0;
     for (size_t i = 0; i < bc->_peakA->bedList.size(); ++i) {
-        if (rankingMeasure == "signalValue") {
-            merge_A.push_back(bc->_peakA->bedList[i].signalValue);
-        }
-        else if(rankingMeasure == "pValue") {
-            merge_A.push_back(bc->_peakA->bedList[i].pValue);
-        }
-        else if(rankingMeasure == "qValue") {
-            merge_A.push_back(bc->_peakA->bedList[i].qValue);
-        }
+        merge_A.push_back(atof(bc->_peakA->bedList[i].fields[rankingMeasure].c_str()));
         merge_B.push_back(0);
         while (start < bc->overlap_index_A[i]) {
             tracker.push_back( bc->overlap_index_B[start] );
-            double bSigVal = 0.0;
-            if (rankingMeasure == "signalValue") {
-                bSigVal = bc->_peakB->bedList[
-                    bc->overlap_index_B[start] ].signalValue;
-            }
-            else if (rankingMeasure == "pValue") {
-                bSigVal = bc->_peakB->bedList[
-                    bc->overlap_index_B[start] ].pValue;
-            }
-            else if (rankingMeasure == "qValue") {
-                bSigVal = bc->_peakB->bedList[
-                    bc->overlap_index_B[start] ].qValue;
-            }
+            double bSigVal = atof(bc->_peakB->bedList[bc->overlap_index_B[start] ].fields[rankingMeasure].c_str());
 
             overlap o;
             string chr(bc->_peakA->bedList[i].chrom);
@@ -220,16 +206,7 @@ build_ranks_vector( ProcessPeaks *bc,
     sort(tracker.begin(), tracker.end());
     for (unsigned int i = 0; i < bc->_peakB->bedList.size(); ++i) {
         if(find(tracker.begin(), tracker.end(), i) == tracker.end()) {
-            double bSigVal = 0.0;
-            if (rankingMeasure == "signalValue") {
-                bSigVal = bc->_peakB->bedList[i].signalValue;
-            }
-            else if (rankingMeasure == "pValue") {
-                bSigVal = bc->_peakB->bedList[i].pValue;
-            }
-            else if (rankingMeasure == "qValue") {
-                bSigVal = bc->_peakB->bedList[i].qValue;
-            }
+            double bSigVal = atof(bc->_peakB->bedList[i].fields[rankingMeasure].c_str());
             merge_A.push_back( 0 );
             merge_B.push_back( bSigVal );
         }
