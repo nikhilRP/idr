@@ -289,8 +289,13 @@ void estimate_marginals(
         temp_pdf_1[k] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (n_samples + 50) / (n_samples + 51);
         temp_pdf_2[k] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (n_samples + 50) / (n_samples  + 51);
 
-        replace(pdf_1.begin(), pdf_1.end(), (double)(k+1), temp_pdf_1[k]);
-        replace(pdf_2.begin(), pdf_2.end(), (double)(k+1), temp_pdf_2[k]);
+        for(int m=0; m<n_samples; ++m)
+        {
+            if(pdf_1[m] == k+1)
+                pdf_1[m] = temp_pdf_1[k];
+            if(pdf_2[m] == k+1)
+                pdf_2[m] = temp_pdf_2[k];
+        }
 
         temp_cdf_1[k] = temp_pdf_1[k] * bin_width;
         temp_cdf_2[k] = temp_pdf_2[k] * bin_width;
