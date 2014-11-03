@@ -39,8 +39,8 @@ double NormalCDFInverse(double p)
 }
 
 void calculate_quantiles(
-		vector<double>& x_cdf, vector<double>& y_cdf,
-		vector<double>& density, double rho)
+    vector<double>& x_cdf, vector<double>& y_cdf,
+    vector<double>& density, double rho)
 {
     for(int i=0; i<x_cdf.size(); ++i)
     {
@@ -51,8 +51,8 @@ void calculate_quantiles(
 }
 
 double cost_function(
-		vector<double>& x_cdf, vector<double>& y_cdf,
-		vector<double>& ez, double rho)
+    vector<double>& x_cdf, vector<double>& y_cdf,
+    vector<double>& ez, double rho)
 {
 
     vector<double> density(x_cdf.size());
@@ -69,9 +69,9 @@ double cost_function(
 }
 
 double maximum_likelihood(
-		vector<double>& x_cdf,
-		vector<double>& y_cdf,
-		vector<double>& ez)
+    vector<double>& x_cdf,
+    vector<double>& y_cdf,
+    vector<double>& ez)
 {
     double ax = -0.998;
     double bx = 0.998;
@@ -177,11 +177,11 @@ double maximum_likelihood(
 }
 
 double gaussian_loglikelihood(
-		vector<double>& x1_pdf, vector<double>& x2_pdf,
-		vector<double>& x1_cdf, vector<double>& x2_cdf,
-		vector<double>& y1_pdf, vector<double>& y2_pdf,
-		vector<double>& y1_cdf, vector<double>& y2_cdf,
-		double p, double rho)
+    vector<double>& x1_pdf, vector<double>& x2_pdf,
+    vector<double>& x1_cdf, vector<double>& x2_cdf,
+    vector<double>& y1_pdf, vector<double>& y2_pdf,
+    vector<double>& y1_cdf, vector<double>& y2_cdf,
+    double p, double rho)
 {
     vector<double> density_c1( x1_pdf.size() );
     double l0 = 0.0;
@@ -195,11 +195,11 @@ double gaussian_loglikelihood(
 }
 
 void estep_gaussian(
-		vector<double>& x1_pdf, vector<double>& x2_pdf,
-		vector<double>& x1_cdf, vector<double>& x2_cdf,
-		vector<double>& y1_pdf, vector<double>& y2_pdf,
-		vector<double>& y1_cdf, vector<double>& y2_cdf,
-		vector<double>& ez, double p, double rho)
+    vector<double>& x1_pdf, vector<double>& x2_pdf,
+    vector<double>& x1_cdf, vector<double>& x2_cdf,
+    vector<double>& y1_pdf, vector<double>& y2_pdf,
+    vector<double>& y1_cdf, vector<double>& y2_cdf,
+    vector<double>& ez, double p, double rho)
 {
     vector<double> density_c1( x1_pdf.size() );
 
@@ -211,10 +211,10 @@ void estep_gaussian(
 }
 
 void estimate_marginals(
-		vector<float>& input, vector<double>& breaks,
-		vector<double>& pdf_1, vector<double>& pdf_2,
-		vector<double>& cdf_1, vector<double>& cdf_2,
-		vector<double>& ez, double p)
+    vector<float>& input, vector<double>& breaks,
+    vector<double>& pdf_1, vector<double>& pdf_2,
+    vector<double>& cdf_1, vector<double>& cdf_2,
+    vector<double>& ez, double p)
 {
     int nbins = breaks.size() - 1;
     int input_size = input.size();
@@ -287,13 +287,13 @@ void estimate_marginals(
 }
 
 void mstep_gaussian(
-		vector<float>& x, vector<float> y,
-		vector<double>& breaks, double* p0, double* rho,
-		vector<double>& x1_pdf, vector<double>& x2_pdf,
-		vector<double>& x1_cdf, vector<double>& x2_cdf,
-		vector<double>& y1_pdf, vector<double>& y2_pdf,
-		vector<double>& y1_cdf, vector<double>& y2_cdf,
-		vector<double>& ez)
+    vector<float>& x, vector<float> y,
+    vector<double>& breaks, double* p0, double* rho,
+    vector<double>& x1_pdf, vector<double>& x2_pdf,
+    vector<double>& x1_cdf, vector<double>& x2_cdf,
+    vector<double>& y1_pdf, vector<double>& y2_pdf,
+    vector<double>& y1_cdf, vector<double>& y2_cdf,
+    vector<double>& ez)
 {
     estimate_marginals(x, breaks, x1_pdf, x2_pdf, x1_cdf, x2_cdf, ez, *p0);
     estimate_marginals(y, breaks, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, *p0);
@@ -306,8 +306,8 @@ void mstep_gaussian(
 
 
 void em_gaussian(
-		vector<float>& x, vector<float>& y,
-		vector< pair<int, double> >& idrLocal)
+    vector<float>& x, vector<float>& y,
+    vector< pair<int, double> >& idrLocal)
 {
     vector<double> ez( x.size() );
 
@@ -375,9 +375,9 @@ void em_gaussian(
 
         if (i > 1)
         {
-        	/* Aitken acceleration criterion checking for breaking the loop */
+            /* Aitken acceleration criterion checking for breaking the loop */
             double a_cri = likelihood[i-2] + (likelihood[i-1] - likelihood[i-2])
-            		/ (1-(likelihood[i]-likelihood[i-1])/(likelihood[i-1]-likelihood[i-2]));
+                / (1-(likelihood[i]-likelihood[i-1])/(likelihood[i-1]-likelihood[i-2]));
             if ( std::abs(a_cri-likelihood[i]) <= eps )
             {
                 flag = false;
@@ -394,9 +394,8 @@ void em_gaussian(
         idrLocal[i].second = a-ez[i];
     }
     fprintf(stderr, "Finished running IDR on the datasets\n");
-	fprintf(stderr, "Final P value = %.15g\n", p0);
-	fprintf(stderr, "Final rho value = %.15g\n", rho);
-	fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
+    fprintf(stderr, "Final P value = %.15g\n", p0);
+    fprintf(stderr, "Final rho value = %.15g\n", rho);
+    fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
 }
 #endif
-
