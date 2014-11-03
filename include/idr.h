@@ -245,8 +245,8 @@ void estimate_marginals(
     vector<double>& ez, 
     double p)
 {
+    size_t n_samples = input.size();
     int nbins = breaks.size() - 1;
-    int input_size = input.size();
 
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_cdf_2 = (double*) calloc(nbins, sizeof(double));
@@ -260,7 +260,7 @@ void estimate_marginals(
         cdf_1[i] = low - breaks.begin();
     }
 
-    int first_size = round((double)(input_size*p));
+    int first_size = round((double)(n_samples*p));
     double bin_width = breaks[1] - breaks[0];
 
     cdf_2 = cdf_1;
@@ -277,11 +277,11 @@ void estimate_marginals(
 
     /* for each bin, estimate the total probability
        mass from the items that fall into this bin */
-    for(int k=0; k<(breaks.size()-1); ++k)
+    for(int k=0; k<nbins; ++k)
     {
         double sum_1 = 0.0;
         double sum_2 = 0.0;
-        for(int m=0; m<cdf_1.size(); ++m)
+        for(int m=0; m<n_samples; ++m)
         {
             if(cdf_1[m] == k+1)
             {
@@ -290,8 +290,8 @@ void estimate_marginals(
             }
         }
 
-        temp_pdf_1[k] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (input_size + 50) / (input_size + 51);
-        temp_pdf_2[k] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (input_size + 50) / (input_size  + 51);
+        temp_pdf_1[k] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (n_samples + 50) / (n_samples + 51);
+        temp_pdf_2[k] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (n_samples + 50) / (n_samples  + 51);
 
         replace(pdf_1.begin(), pdf_1.end(), (double)(k+1), temp_pdf_1[k]);
         replace(pdf_2.begin(), pdf_2.end(), (double)(k+1), temp_pdf_2[k]);
@@ -313,7 +313,7 @@ void estimate_marginals(
         new_cdf_2[p] = temp_cdf_2[p-1] + new_cdf_2[p-1];
     }
 
-    for(int l=0; l<input.size(); ++l)
+    for(int l=0; l<n_samples; ++l)
     {
         int i = lroundf(cdf_1[l]);
         double b = input[l] - breaks[i-1];
