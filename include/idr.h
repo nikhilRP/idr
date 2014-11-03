@@ -269,11 +269,7 @@ void estimate_marginals(
 
     /* estimate the weighted signal fraction and noise fraction sums */
     double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
-    double dup_sum_ez = 0.0;
-    for(int j=0; j<ez.size(); ++j)
-    {
-        dup_sum_ez = dup_sum_ez + (1.0 - ez[j]);
-    }
+    double dup_sum_ez = n_samples - sum_ez;
 
     /* for each bin, estimate the total probability
        mass from the items that fall into this bin */
