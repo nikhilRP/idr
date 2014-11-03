@@ -39,39 +39,52 @@ double NormalCDFInverse(double p)
 }
 
 void calculate_quantiles(
-    vector<double>& x_cdf, vector<double>& y_cdf,
-    vector<double>& density, double rho)
+    double rho,
+    size_t n_samples,
+    double* x_cdf, 
+    double* y_cdf,
+    double* updated_density
+    )
 {
-    for(int i=0; i<x_cdf.size(); ++i)
+    for(int i=0; i<n_samples; ++i)
     {
-        double a = pow(NormalCDFInverse(x_cdf[i]), 2) + pow(NormalCDFInverse(y_cdf[i]), 2);
+        double a = pow(NormalCDFInverse(x_cdf[i]), 2) 
+                   + pow(NormalCDFInverse(y_cdf[i]), 2);
         double b = NormalCDFInverse(x_cdf[i]) * NormalCDFInverse(y_cdf[i]);
-        density[i] = exp( -log(1 - pow(rho, 2)) / 2 - rho / (2 * (1 - pow(rho, 2))) * (rho*a-2*b) );
+        updated_density[i] = exp( -log(1 - pow(rho, 2)) / 2 
+                                  - rho/(2 * (1 - pow(rho, 2))) * (rho*a-2*b));
     }
 }
 
 double cost_function(
-    vector<double>& x_cdf, vector<double>& y_cdf,
-    vector<double>& ez, double rho)
+    double rho,
+    size_t n_samples,
+    double* x_cdf, 
+    double* y_cdf,
+    double* ez )
 {
 
-    vector<double> density(x_cdf.size());
-    vector<double> new_density(x_cdf.size());
-
-    calculate_quantiles(x_cdf, y_cdf, density, rho);
+    double* new_density = (double*) calloc(n_samples, sizeof(double));
+    calculate_quantiles(rho, 
+                        n_samples,
+                        x_cdf, 
+                        y_cdf, 
+                        new_density);
 
     double cop_den = 0.0;
-    for(int i=0; i<density.size(); ++i)
+    for(int i=0; i<n_samples; ++i)
     {
-        cop_den = cop_den + (ez[i] * log(density[i]));
+        cop_den = cop_den + (ez[i] * log(new_density[i]));
     }
+    free(new_density);
     return -cop_den;
 }
 
 double maximum_likelihood(
-    vector<double>& x_cdf,
-    vector<double>& y_cdf,
-    vector<double>& ez)
+    size_t n_samples,
+    double* x_cdf,
+    double* y_cdf,
+    double* ez)
 {
     double ax = -0.998;
     double bx = 0.998;
@@ -97,7 +110,7 @@ double maximum_likelihood(
 
     d = 0.;/* -Wall */
     e = 0.;
-    fx = cost_function(x_cdf, y_cdf, ez, x);
+    fx = cost_function(x, n_samples, x_cdf, y_cdf, ez);
     fv = fx;
     fw = fx;
     tol3 = tol / 3.;
@@ -150,7 +163,7 @@ double maximum_likelihood(
         else
             u = x - tol1;
 
-        fu = cost_function(x_cdf, y_cdf, ez, u);
+        fu = cost_function(u, n_samples, x_cdf, y_cdf, ez);
 
         /*  update  a, b, v, w, and x */
         if (fu <= fx)
@@ -186,7 +199,8 @@ double gaussian_loglikelihood(
     vector<double> density_c1( x1_pdf.size() );
     double l0 = 0.0;
 
-    calculate_quantiles(x1_cdf, y1_cdf, density_c1, rho);
+    calculate_quantiles(rho, x1_cdf.size(), 
+                        x1_cdf.data(), y1_cdf.data(), density_c1.data());
     for(int i=0; i<density_c1.size(); ++i)
     {
         l0 = l0 + log(p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1.0 - p) * 1.0 * x2_pdf[i] * y2_pdf[i]);
@@ -195,35 +209,51 @@ double gaussian_loglikelihood(
 }
 
 void estep_gaussian(
-    vector<double>& x1_pdf, vector<double>& x2_pdf,
-    vector<double>& x1_cdf, vector<double>& x2_cdf,
-    vector<double>& y1_pdf, vector<double>& y2_pdf,
-    vector<double>& y1_cdf, vector<double>& y2_cdf,
-    vector<double>& ez, double p, double rho)
+    size_t n_samples,
+    double* x1_pdf, double* x2_pdf,
+    double* x1_cdf, double* x2_cdf,
+    double* y1_pdf, double* y2_pdf,
+    double* y1_cdf, double* y2_cdf,
+    double* ez, double p, double rho)
 {
-    vector<double> density_c1( x1_pdf.size() );
-
-    calculate_quantiles(x1_cdf, y1_cdf, density_c1, rho);
-    for(int i=0; i<ez.size(); ++i)
+    double* density_c1 = (double*) calloc( sizeof(double), n_samples );
+    
+    /* update density_c1 */
+    calculate_quantiles(rho, n_samples, x1_cdf, y1_cdf, density_c1);
+    for(int i=0; i<n_samples; ++i)
     {
-        ez[i] = p * density_c1[i] * x1_pdf[i] * y1_pdf[i] / (p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1-p) * 1 * x2_pdf[i] * y2_pdf[i]);
+        /* XXX BUG? Shouldn't the last line be 
+           ... +(1-p)*(1-density_c1[i])*x2_pdf[i]*y2_pdf[i]) */
+        ez[i] = p * density_c1[i] * x1_pdf[i] * y1_pdf[i] 
+            / (p * density_c1[i] * x1_pdf[i] * y1_pdf[i] 
+               + (1-p) * 1 * x2_pdf[i] * y2_pdf[i]);
     }
 }
 
+/* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
-    vector<float>& input, vector<double>& breaks,
-    vector<double>& pdf_1, vector<double>& pdf_2,
-    vector<double>& cdf_1, vector<double>& cdf_2,
-    vector<double>& ez, double p)
+    vector<float>& input, 
+    vector<double>& breaks,
+    vector<double>& pdf_1, 
+    vector<double>& pdf_2,
+    vector<double>& cdf_1, 
+    vector<double>& cdf_2,
+    /* the estimated mixture paramater for each point */
+    vector<double>& ez, 
+    double p)
 {
     int nbins = breaks.size() - 1;
     int input_size = input.size();
 
-    vector<double> temp_cdf_1(nbins), temp_cdf_2(nbins), temp_pdf_1(nbins), temp_pdf_2(nbins);
+    vector<double> temp_cdf_1(nbins); 
+    vector<double> temp_cdf_2(nbins);
+    vector<double> temp_pdf_1(nbins); 
+    vector<double> temp_pdf_2(nbins);
 
     for(int i=0; i<input.size(); ++i)
     {
-        std::vector<double>::iterator low = lower_bound(breaks.begin(), breaks.end(), (double)input[i]);
+        std::vector<double>::iterator low = lower_bound(
+            breaks.begin(), breaks.end(), (double)input[i]);
         cdf_1[i] = low - breaks.begin();
     }
 
@@ -234,14 +264,16 @@ void estimate_marginals(
     pdf_1 = cdf_1;
     pdf_2 = cdf_1;
 
+    /* estimate the weighted signal fraction and noise fraction sums */
     double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
     double dup_sum_ez = 0.0;
-
     for(int j=0; j<ez.size(); ++j)
     {
         dup_sum_ez = dup_sum_ez + (1.0 - ez[j]);
     }
 
+    /* for each bin, estimate the total probability
+       mass from the items that fall into this bin */
     for(int k=1; k<breaks.size(); ++k)
     {
         double sum_1 = 0.0;
@@ -298,7 +330,8 @@ void mstep_gaussian(
     estimate_marginals(x, breaks, x1_pdf, x2_pdf, x1_cdf, x2_cdf, ez, *p0);
     estimate_marginals(y, breaks, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, *p0);
 
-    *rho = maximum_likelihood(x1_cdf, y1_cdf, ez);
+    *rho = maximum_likelihood(
+        x1_cdf.size(), x1_cdf.data(), y1_cdf.data(), ez.data());
 
     double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
     *p0 = sum_ez/(double)x.size();
@@ -363,8 +396,12 @@ void em_gaussian(
     int iter_counter = 1;
     while(flag)
     {
-        estep_gaussian(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
-            y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, p0, rho);
+        estep_gaussian(x1_pdf.size(),
+                       x1_pdf.data(), x2_pdf.data(), 
+                       x1_cdf.data(), x2_cdf.data(),
+                       y1_pdf.data(), y2_pdf.data(), 
+                       y1_cdf.data(), y2_cdf.data(), 
+                       ez.data(), p0, rho);
 
         mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
             x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
