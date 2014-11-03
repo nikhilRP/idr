@@ -215,11 +215,12 @@ void estep_gaussian(
     double* y1_pdf, double* y2_pdf,
     double* y1_cdf, double* y2_cdf,
     double* ez, double p, double rho)
+
 {
-    double* density_c1 = (double*) calloc( sizeof(double), n_samples );
-    
     /* update density_c1 */
+    double* density_c1 = (double*) calloc( sizeof(double), n_samples );
     calculate_quantiles(rho, n_samples, x1_cdf, y1_cdf, density_c1);
+    
     for(int i=0; i<n_samples; ++i)
     {
         /* XXX BUG? Shouldn't the last line be 
@@ -228,6 +229,8 @@ void estep_gaussian(
             / (p * density_c1[i] * x1_pdf[i] * y1_pdf[i] 
                + (1-p) * 1 * x2_pdf[i] * y2_pdf[i]);
     }
+
+    free(density_c1);
 }
 
 /* use a histogram estimator to estimate the marginal distributions */
@@ -245,11 +248,11 @@ void estimate_marginals(
     int nbins = breaks.size() - 1;
     int input_size = input.size();
 
-    vector<double> temp_cdf_1(nbins); 
-    vector<double> temp_cdf_2(nbins);
-    vector<double> temp_pdf_1(nbins); 
-    vector<double> temp_pdf_2(nbins);
-
+    double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
+    double* temp_cdf_2 = (double*) calloc(nbins, sizeof(double));
+    double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
+    double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
+    
     for(int i=0; i<input.size(); ++i)
     {
         std::vector<double>::iterator low = lower_bound(
@@ -274,36 +277,37 @@ void estimate_marginals(
 
     /* for each bin, estimate the total probability
        mass from the items that fall into this bin */
-    for(int k=1; k<breaks.size(); ++k)
+    for(int k=0; k<(breaks.size()-1); ++k)
     {
         double sum_1 = 0.0;
         double sum_2 = 0.0;
         for(int m=0; m<cdf_1.size(); ++m)
         {
-            if(cdf_1[m] == k)
+            if(cdf_1[m] == k+1)
             {
                 sum_1 = sum_1 + ez[m];
                 sum_2 = sum_2 + (1.0 - ez[m]);
             }
         }
 
-        temp_pdf_1[k-1] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (input_size + 50) / (input_size + 51);
-        temp_pdf_2[k-1] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (input_size + 50) / (input_size  + 51);
+        temp_pdf_1[k] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (input_size + 50) / (input_size + 51);
+        temp_pdf_2[k] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (input_size + 50) / (input_size  + 51);
 
-        replace(pdf_1.begin(), pdf_1.end(), (double)k, temp_pdf_1[k-1]);
-        replace(pdf_2.begin(), pdf_2.end(), (double)k, temp_pdf_2[k-1]);
+        replace(pdf_1.begin(), pdf_1.end(), (double)(k+1), temp_pdf_1[k]);
+        replace(pdf_2.begin(), pdf_2.end(), (double)(k+1), temp_pdf_2[k]);
 
-        temp_cdf_1[k-1] = temp_pdf_1[k-1] * bin_width;
-        temp_cdf_2[k-1] = temp_pdf_2[k-1] * bin_width;
+        temp_cdf_1[k] = temp_pdf_1[k] * bin_width;
+        temp_cdf_2[k] = temp_pdf_2[k] * bin_width;
     }
 
-    vector<double> new_cdf_1(temp_cdf_1.size()), new_cdf_2(temp_cdf_2.size());
+    double* new_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
+    double* new_cdf_2 = (double*) calloc(nbins, sizeof(double)); 
 
     new_cdf_1[0] = 0.0;
     new_cdf_2[0] = 0.0;
 
     // Naive sequential scan
-    for(int p=1; p<temp_cdf_1.size(); ++p)
+    for(int p=1; p<nbins; ++p)
     {
         new_cdf_1[p] = temp_cdf_1[p-1] + new_cdf_1[p-1];
         new_cdf_2[p] = temp_cdf_2[p-1] + new_cdf_2[p-1];
@@ -316,6 +320,13 @@ void estimate_marginals(
         cdf_1[l] = new_cdf_1[i-1] + temp_pdf_1[i-1] * b;
         cdf_2[l] = new_cdf_2[i-1] + temp_pdf_2[i-1] * b;
     }
+
+    free(temp_pdf_1);
+    free(temp_pdf_2);
+    free(temp_cdf_1);
+    free(temp_cdf_2);
+    free(new_cdf_1);
+    free(new_cdf_2);
 }
 
 void mstep_gaussian(
@@ -327,8 +338,14 @@ void mstep_gaussian(
     vector<double>& y1_cdf, vector<double>& y2_cdf,
     vector<double>& ez)
 {
-    estimate_marginals(x, breaks, x1_pdf, x2_pdf, x1_cdf, x2_cdf, ez, *p0);
-    estimate_marginals(y, breaks, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez, *p0);
+    estimate_marginals(x, breaks, 
+                       x1_pdf, x2_pdf, 
+                       x1_cdf, x2_cdf, 
+                       ez, *p0);
+    estimate_marginals(y, breaks, 
+                       y1_pdf, y2_pdf, 
+                       y1_cdf, y2_cdf, 
+                       ez, *p0);
 
     *rho = maximum_likelihood(
         x1_cdf.size(), x1_cdf.data(), y1_cdf.data(), ez.data());
@@ -409,7 +426,8 @@ void em_gaussian(
         double l = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
             y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
         likelihood.push_back(l);
-
+        printf("%i\t%e\n", iter_counter, l);
+        
         if (i > 1)
         {
             /* Aitken acceleration criterion checking for breaking the loop */
