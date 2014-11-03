@@ -253,7 +253,7 @@ void estimate_marginals(
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
     
-    for(int i=0; i<input.size(); ++i)
+    for(int i=0; i<n_samples; ++i)
     {
         std::vector<double>::iterator low = lower_bound(
             breaks.begin(), breaks.end(), (double)input[i]);
@@ -262,13 +262,15 @@ void estimate_marginals(
 
     int first_size = round((double)(n_samples*p));
     double bin_width = breaks[1] - breaks[0];
-
+    
     cdf_2 = cdf_1;
     pdf_1 = cdf_1;
     pdf_2 = cdf_1;
 
     /* estimate the weighted signal fraction and noise fraction sums */
-    double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
+    double sum_ez = 0;
+    for(int i=0; i<n_samples; ++i)
+        sum_ez += ez[i];
     double dup_sum_ez = n_samples - sum_ez;
 
     /* for each bin, estimate the total probability
