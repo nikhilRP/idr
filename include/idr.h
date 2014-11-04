@@ -353,7 +353,7 @@ void em_gaussian(
     size_t n_samples,
     float* x, 
     float* y,
-    vector< pair<int, double> >& idrLocal)
+    double* localIDR)
 {
     int i;
     
@@ -444,12 +444,9 @@ void em_gaussian(
 
     }
     
-    vector<double> temp(n_samples);
     for(i=0; i<n_samples; ++i)
     {
-        double a = 1.0;
-        idrLocal[i].first = i+1;
-        idrLocal[i].second = a-ez[i];
+        localIDR[i] = 1.0 - ez[i];
     }
     fprintf(stderr, "Finished running IDR on the datasets\n");
     fprintf(stderr, "Final P value = %.15g\n", p0);
