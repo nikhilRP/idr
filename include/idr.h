@@ -279,16 +279,24 @@ void estimate_marginals(
 {
     const double bin_width = ((double)n_samples)/nbins;
     double* breaks = (double*) alloca(sizeof(double)*(nbins+1));
+    /* make this a little smaller to avoid rounding errors */
     breaks[0] = 0. - 1e-6;
     for(int i=1; i<(nbins+1); ++i)
     {
         breaks[i] = i*bin_width;
     }
+    /* to avoid rounding errors */
     breaks[nbins] += 1e-6;
     
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
+    
+    /* estimate the weighted signal fraction and noise fraction sums */
+    double sum_ez = 0;
+    for(int i=0; i<n_samples; ++i)
+        sum_ez += ez[i];
+    double dup_sum_ez = n_samples - sum_ez;
 
     /* find which bin each value corresponds to, and 
        set this to the correct value */
@@ -299,12 +307,6 @@ void estimate_marginals(
         pdf_1[i] = val;
         pdf_2[i] = val;
     }
-    
-    /* estimate the weighted signal fraction and noise fraction sums */
-    double sum_ez = 0;
-    for(int i=0; i<n_samples; ++i)
-        sum_ez += ez[i];
-    double dup_sum_ez = n_samples - sum_ez;
 
     /* scale factor for the histogram estimator - I have no idea where this is 
        coming from or what the point is */
