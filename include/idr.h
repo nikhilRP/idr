@@ -240,27 +240,6 @@ void estep_gaussian(
     free(density_c1);
 }
 
-/*
- * Basic Binary search
- */
-size_t bsearch(
-    double key,
-    double* D,
-    size_t n)
-{
-    int lo = 0;
-    int hi = n;
-    unsigned int mid;
-    while (hi - lo > 1) {
-        mid = (hi + lo) / 2;
-        if ( D[mid] < key )
-            lo = mid;
-        else
-            hi = mid;
-    }
-    return lo;
-}
-
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
     size_t n_samples,
@@ -292,17 +271,12 @@ void estimate_marginals(
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);
         
-    /* adding a pseudo count of 1 to each bin to prevent divide by zero */
+        /* add a pseudo count of 1 to each bin to prevent divide by zero */
         sum_ez += ez[i];
         sum_ez_comp += (1-ez[i]);
-
-    }
-
-    /*we don't use the 1- relation to make the result more numerically stable*/
-    for(i=0; i<nbins; ++i)
-    {
     }
     
+    /* normalize the bin counts */
     double cumsum = 0;
     for(i=0; i<nbins; ++i)
     {
