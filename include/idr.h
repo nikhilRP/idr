@@ -269,8 +269,9 @@ void estimate_marginals(
         cdf_1[i] = val;
         pdf_1[i] = val;
         pdf_2[i] = val;
+        //printf("%i\t%e\n", i, cdf_1[i]);
     }
-
+    //exit(0);
     int first_size = round((double)(n_samples*p));
     double bin_width = breaks[1] - breaks[0];
     
@@ -280,6 +281,9 @@ void estimate_marginals(
         sum_ez += ez[i];
     double dup_sum_ez = n_samples - sum_ez;
 
+    /* scale factor for the histogram estimator - I have no idea where this is 
+       coming from or what the point is */
+    double scale = ((n_samples+nbins)/(bin_width*(n_samples+nbins+1.0)));
     /* for each bin, estimate the total probability
        mass from the items that fall into this bin */
     for(int k=0; k<nbins; ++k)
@@ -294,9 +298,9 @@ void estimate_marginals(
                 sum_2 = sum_2 + (1.0 - ez[m]);
             }
         }
-
-        temp_pdf_1[k] = (sum_1 + 1) / (sum_ez + nbins) / bin_width * (n_samples + 50) / (n_samples + 51);
-        temp_pdf_2[k] = (sum_2 + 1) / (dup_sum_ez + nbins) / bin_width * (n_samples + 50) / (n_samples  + 51);
+        
+        temp_pdf_1[k] = scale*(sum_1 + 1)/(sum_ez + nbins);
+        temp_pdf_2[k] = scale*(sum_2 + 1)/(dup_sum_ez + nbins);
 
         for(int m=0; m<n_samples; ++m)
         {
