@@ -411,9 +411,8 @@ void em_gaussian(
 
     /* can do better. Jus replicating IDR R style coding */
     bool flag = true;
-    int i = 0;
-    int iter_counter = 0;
-    while(flag)
+    int iter_counter;
+    for(iter_counter=0;;iter_counter++)
     {
         mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
             x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
@@ -423,18 +422,16 @@ void em_gaussian(
         likelihood.push_back(l);
         printf("%i\t%e\n", iter_counter, l);
         
-        if (i > 1)
+        if (iter_counter > 1)
         {
             /* Aitken acceleration criterion checking for breaking the loop */
-            double a_cri = likelihood[i-2] + (likelihood[i-1] - likelihood[i-2])
-                / (1-(likelihood[i]-likelihood[i-1])/(likelihood[i-1]-likelihood[i-2]));
-            if ( std::abs(a_cri-likelihood[i]) <= eps )
-            {
-                flag = false;
-            }
+            double a_cri = likelihood[iter_counter-2] + (
+                likelihood[iter_counter-1] - likelihood[iter_counter-2])
+                / (1-(likelihood[iter_counter]-likelihood[iter_counter-1])/(
+                       likelihood[iter_counter-1]-likelihood[iter_counter-2]));
+            if ( std::abs(a_cri-likelihood[iter_counter]) <= eps )
+            { break; }
         }
-        i++;
-        iter_counter++;
 
         estep_gaussian(x1_pdf.size(),
                        x1_pdf.data(), x2_pdf.data(), 
@@ -443,6 +440,7 @@ void em_gaussian(
                        y1_cdf.data(), y2_cdf.data(), 
                        ez.data(), p0, rho);
     }
+    
     vector<double> temp(ez.size());
     for(int i=0; i<ez.size(); ++i)
     {
