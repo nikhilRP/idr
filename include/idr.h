@@ -208,9 +208,8 @@ double gaussian_loglikelihood(
     calculate_quantiles(rho, n_samples, x1_cdf, y1_cdf, density_c1);
     for(int i=0; i<n_samples; ++i)
     {
-        /* BUG XXX shouldnt line 2 be (1.0-p)*1.0*x2_pdf[i]*y2_pdf[i]) */
         l0 = l0 + log(p*density_c1[i]*x1_pdf[i]*y1_pdf[i] 
-                      + (1.0-p)*1.0*x2_pdf[i]*y2_pdf[i]);
+                      + (1.0-p)*x2_pdf[i]*y2_pdf[i]);
     }
     free(density_c1);
     return l0;
