@@ -345,11 +345,16 @@ void estimate_marginals(
     new_cdf_1[0] = 0.0;
 
     // Naive sequential scan
+    double sum = 0;
+    double sum2 = 0;
     for(int p=1; p<nbins; ++p)
     {
+        sum += temp_pdf_1[p];
+        sum2 += temp_pdf_2[p];
         new_cdf_1[p] = temp_cdf_1[p-1] + new_cdf_1[p-1];
     }
-
+    printf("%e\t%e\n", sum, sum2);
+    exit(0);
     for(int l=0; l<n_samples; ++l)
     {
         int i = lroundf(cdf_1[l]);
