@@ -277,36 +277,73 @@ void estimate_marginals(
     /* the global mixture param */
     double p)
 {
+    /* counter we will use throughout the script */
+    int i;
+    
     const double bin_width = ((double)n_samples)/nbins;
     double* breaks = (double*) alloca(sizeof(double)*(nbins+1));
     /* make this a little smaller to avoid rounding errors */
     breaks[0] = 0. - 1e-6;
-    for(int i=1; i<(nbins+1); ++i)
+    for(i=1; i<(nbins+1); ++i)
     {
         breaks[i] = i*bin_width;
     }
     /* to avoid rounding errors */
     breaks[nbins] += 1e-6;
+        
+    /* bin the observations */
+    double* bin_dens_1 = (double*) calloc(sizeof(double), nbins);
+    double* bin_cumsum_1 = (double*) calloc(sizeof(double), nbins);
+    double* bin_dens_2 = (double*) calloc(sizeof(double), nbins);
+    for(int i=0; i<n_samples; ++i)
+    {
+        int bin_i = bsearch(input[i], breaks, nbins);
+        bin_dens_1[bin_i] += ez[i];
+        bin_dens_2[bin_i] += (1-ez[i]);
+    }
+
+    /* normalize the bin counts, adding 1 pseudo count to each 
+       bin to prevent divide by zero */
+    double sum_ez = nbins;
+    double sum_ez_comp = nbins;
+    /*we don't use the 1- relation to make the result more numerically stable*/
+    for(i=0; i<nbins; ++i)
+    {
+        sum_ez += bin_dens_1[i];
+        //printf("%i\t%e\t%e\n", i, bin_dens_1[i], sum_ez);
+        sum_ez_comp += bin_dens_2[i];
+    }
     
+    double cumsum = 0;
+    for(i=0; i<nbins; ++i)
+    {
+        bin_dens_1[i] = (bin_dens_1[i]+1)/sum_ez;
+        cumsum += bin_dens_1[i];
+        bin_cumsum_1[i] = cumsum;
+        bin_dens_2[i] = (bin_dens_2[i]+1)/sum_ez_comp;
+        /*
+        printf("%e\t%e\t%e\t%e\t%e\n", 
+               bin_dens_1[i], bin_dens_2[i], bin_cumsum_1[i], 
+               sum_ez, sum_ez_comp);
+        */
+    }
+        
+    for(i=0; i<n_samples; ++i)
+    {
+        int bin_i = bsearch(input[i], breaks, nbins);
+        pdf_1[i] = bin_dens_1[bin_i];
+        pdf_2[i] = bin_dens_2[bin_i];
+        cdf_1[i] = bin_cumsum_1[bin_i];
+        //printf("%e\t%e\t%e\n", pdf_1[i], pdf_2[i], cdf_1[i]);
+    }
+}
+
+
+#if 0
+void OLD_CODE() {
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
-    
-    /* estimate the weighted signal fraction and noise fraction sums */
-    double sum_ez = 0;
-    for(int i=0; i<n_samples; ++i)
-        sum_ez += ez[i];
-    double dup_sum_ez = n_samples - sum_ez;
-
-    /* find which bin each value corresponds to, and 
-       set this to the correct value */
-    for(int i=0; i<n_samples; ++i)
-    {
-        double val = (double) bsearch(input[i], breaks, nbins);
-        cdf_1[i] = val;
-        pdf_1[i] = val;
-        pdf_2[i] = val;
-    }
 
     /* scale factor for the histogram estimator - I have no idea where this is 
        coming from or what the point is */
@@ -362,6 +399,7 @@ void estimate_marginals(
     free(temp_cdf_1);
     free(new_cdf_1);
 }
+#endif
 
 void mstep_gaussian(
     double* p0, double* rho,
