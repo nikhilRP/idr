@@ -236,17 +236,19 @@ void estep_gaussian(
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
     size_t n_samples,
-    vector<float>& input, 
-    vector<double>& breaks,
-    vector<double>& pdf_1, 
-    vector<double>& pdf_2,
-    vector<double>& cdf_1, 
+    float* input, 
+    double* pdf_1, 
+    double* pdf_2,
+    double* cdf_1, 
     /* the estimated mixture paramater for each point */
-    vector<double>& ez, 
+    double* ez, 
+    
+    size_t nbins,
+    vector<double>& breaks,
+    
+    /* the global mixture param */
     double p)
 {
-    int nbins = breaks.size() - 1;
-
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
@@ -255,15 +257,15 @@ void estimate_marginals(
     {
         std::vector<double>::iterator low = lower_bound(
             breaks.begin(), breaks.end(), (double)input[i]);
-        cdf_1[i] = low - breaks.begin();
+        double val = low - breaks.begin();
+        cdf_1[i] = val;
+        pdf_1[i] = val;
+        pdf_2[i] = val;
     }
 
     int first_size = round((double)(n_samples*p));
     double bin_width = breaks[1] - breaks[0];
     
-    pdf_1 = cdf_1;
-    pdf_2 = cdf_1;
-
     /* estimate the weighted signal fraction and noise fraction sums */
     double sum_ez = 0;
     for(int i=0; i<n_samples; ++i)
@@ -379,14 +381,16 @@ void em_gaussian(
     int iter_counter;
     for(iter_counter=0;;iter_counter++)
     {
-        estimate_marginals(n_samples, x, breaks, 
-                           x1_pdf, x2_pdf, 
-                           x1_cdf, 
-                           ez, p0);
-        estimate_marginals(n_samples, y, breaks, 
-                           y1_pdf, y2_pdf, 
-                           y1_cdf, 
-                           ez, p0);
+        estimate_marginals(n_samples, x.data(), 
+                           x1_pdf.data(), x2_pdf.data(), x1_cdf.data(), 
+                           ez.data(),
+                           n_bins, breaks, 
+                           p0);
+        estimate_marginals(n_samples, y.data(), 
+                           y1_pdf.data(), y2_pdf.data(), y1_cdf.data(), 
+                           ez.data(),
+                           n_bins, breaks,
+                           p0);
 
         mstep_gaussian(&p0, &rho, n_samples, 
                        x1_cdf.data(), y1_cdf.data(), ez.data());
