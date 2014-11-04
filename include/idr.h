@@ -350,25 +350,28 @@ void mstep_gaussian(
 
 
 void em_gaussian(
-    vector<float>& x, vector<float>& y,
+    vector<float>& x, 
+    vector<float>& y,
     vector< pair<int, double> >& idrLocal)
 {
+    int i;
     size_t n_samples = x.size();
-    size_t n_bins = 50;
-    vector<double> ez( n_samples );
-
+    
+    double* ez = (double*) malloc( sizeof(double)*n_samples );
     int mid = round((float) n_samples/2);
+    for(i = 0; i<n_samples/2; i++)
+        ez[i] = 0.9;
+    for(i = n_samples/2; i<n_samples; i++)
+        ez[i] = 0.1;
 
-    fill(ez.begin(), ez.begin()+mid, 0.9);
-    fill(ez.begin()+mid, ez.end(), 0.1);
-
-    float bin_width = (float)(n_samples-1)/n_bins;
-
+    /* initialize the default configuration options */
     double p0 = 0.5;
     double rho = 0.0;
     double eps = 0.01;
 
-    /* Breaks for binning the data */
+    /* Initialize the set of break points for the histogram averaging */
+    size_t n_bins = 50;
+    float bin_width = (float)(n_samples-1)/n_bins;
     vector<double> breaks(n_bins+1);
     breaks[0] = (double)1-bin_width/(2*n_bins);
     for(int i=1; i<(n_bins+1); ++i)
@@ -395,24 +398,24 @@ void em_gaussian(
     {
         estimate_marginals(n_samples, x.data(), 
                            x1_pdf, x2_pdf, x1_cdf, 
-                           ez.data(),
+                           ez,
                            n_bins, breaks, 
                            p0);
         estimate_marginals(n_samples, y.data(), 
                            y1_pdf, y2_pdf, y1_cdf, 
-                           ez.data(),
+                           ez,
                            n_bins, breaks,
                            p0);
 
         mstep_gaussian(&p0, &rho, n_samples, 
-                       x1_cdf, y1_cdf, ez.data());
+                       x1_cdf, y1_cdf, ez);
 
         estep_gaussian(n_samples,
                        x1_pdf, x2_pdf, 
                        x1_cdf, 
                        y1_pdf, y2_pdf, 
                        y1_cdf, 
-                       ez.data(), 
+                       ez, 
                        p0, rho);
 
         double l = gaussian_loglikelihood(
@@ -437,8 +440,8 @@ void em_gaussian(
 
     }
     
-    vector<double> temp(ez.size());
-    for(int i=0; i<ez.size(); ++i)
+    vector<double> temp(n_samples);
+    for(i=0; i<n_samples; ++i)
     {
         double a = 1.0;
         idrLocal[i].first = i+1;
