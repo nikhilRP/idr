@@ -350,12 +350,12 @@ void mstep_gaussian(
 
 
 void em_gaussian(
-    vector<float>& x, 
-    vector<float>& y,
+    size_t n_samples,
+    float* x, 
+    float* y,
     vector< pair<int, double> >& idrLocal)
 {
     int i;
-    size_t n_samples = x.size();
     
     double* ez = (double*) malloc( sizeof(double)*n_samples );
     int mid = round((float) n_samples/2);
@@ -372,6 +372,7 @@ void em_gaussian(
     /* Initialize the set of break points for the histogram averaging */
     size_t n_bins = 50;
     float bin_width = (float)(n_samples-1)/n_bins;
+
     vector<double> breaks(n_bins+1);
     breaks[0] = (double)1-bin_width/(2*n_bins);
     for(int i=1; i<(n_bins+1); ++i)
@@ -391,17 +392,17 @@ void em_gaussian(
     double* y1_cdf = (double*) calloc(sizeof(double), n_samples);
     
     /* Likelihood vector */
-    vector<double> likelihood;
+    double likelihood[3] = {0,0,0};
 
     int iter_counter;
     for(iter_counter=0;;iter_counter++)
     {
-        estimate_marginals(n_samples, x.data(), 
+        estimate_marginals(n_samples, x, 
                            x1_pdf, x2_pdf, x1_cdf, 
                            ez,
                            n_bins, breaks, 
                            p0);
-        estimate_marginals(n_samples, y.data(), 
+        estimate_marginals(n_samples, y, 
                            y1_pdf, y2_pdf, y1_cdf, 
                            ez,
                            n_bins, breaks,
@@ -423,18 +424,21 @@ void em_gaussian(
             x1_pdf, x2_pdf, x1_cdf, 
             y1_pdf, y2_pdf, y1_cdf, 
             p0, rho);
-        
-        likelihood.push_back(l);
+
+        /* update the likelihood list */
+        likelihood[0] = likelihood[1];
+        likelihood[1] = likelihood[2];
+        likelihood[2] = l;
         printf("%i\t%e\n", iter_counter, l);
         
         if (iter_counter > 1)
         {
             /* Aitken acceleration criterion checking for breaking the loop */
-            double a_cri = likelihood[iter_counter-2] + (
-                likelihood[iter_counter-1] - likelihood[iter_counter-2])
-                / (1-(likelihood[iter_counter]-likelihood[iter_counter-1])/(
-                       likelihood[iter_counter-1]-likelihood[iter_counter-2]));
-            if ( std::abs(a_cri-likelihood[iter_counter]) <= eps )
+            double a_cri = likelihood[0] + (
+                likelihood[1]-likelihood[0])
+                / (1-(likelihood[2]-likelihood[1])/(
+                       likelihood[1]-likelihood[0]));
+            if ( abs(a_cri-likelihood[2]) <= eps )
             { break; }
         }
 
@@ -451,5 +455,13 @@ void em_gaussian(
     fprintf(stderr, "Final P value = %.15g\n", p0);
     fprintf(stderr, "Final rho value = %.15g\n", rho);
     fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
+    
+    free(x1_pdf);
+    free(x2_pdf);
+    free(x1_cdf);
+    free(y1_pdf);
+    free(y2_pdf);
+    free(y1_cdf);
+
 }
 #endif

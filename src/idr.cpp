@@ -255,7 +255,7 @@ int main(int argc, char* argv[])
 
     fprintf(stderr, "Fit 2-component model - started\n");
 
-    em_gaussian(ranks_A, ranks_B, idr);
+    em_gaussian(ranks_A.size(), ranks_A.data(), ranks_B.data(), idr);
 
     /* Make a copy of the local IDR vector, and then
        update the 'second' field to store the global
