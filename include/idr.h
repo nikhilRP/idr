@@ -333,28 +333,16 @@ void estimate_marginals(
 }
 
 void mstep_gaussian(
-    vector<float>& x, vector<float> y,
-    vector<double>& breaks, double* p0, double* rho,
-    vector<double>& x1_pdf, vector<double>& x2_pdf,
-    vector<double>& x1_cdf, vector<double>& x2_cdf,
-    vector<double>& y1_pdf, vector<double>& y2_pdf,
-    vector<double>& y1_cdf, vector<double>& y2_cdf,
+    double* p0, double* rho,
+    vector<double>& x1_cdf, 
+    vector<double>& y1_cdf,
     vector<double>& ez)
 {
-    estimate_marginals(x, breaks, 
-                       x1_pdf, x2_pdf, 
-                       x1_cdf, x2_cdf, 
-                       ez, *p0);
-    estimate_marginals(y, breaks, 
-                       y1_pdf, y2_pdf, 
-                       y1_cdf, y2_cdf, 
-                       ez, *p0);
-
     *rho = maximum_likelihood(
         x1_cdf.size(), x1_cdf.data(), y1_cdf.data(), ez.data());
 
     double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
-    *p0 = sum_ez/(double)x.size();
+    *p0 = sum_ez/(double)ez.size();
 }
 
 
@@ -395,27 +383,23 @@ void em_gaussian(
      */
     vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
     vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
-
-    fprintf(stderr, "    Initialising the marginals\n");
-
-    mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
-        x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
-
+    
     /* Likelihood vector */
     vector<double> likelihood;
-    double li = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
-        y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
 
-    likelihood.push_back(li);
-    fprintf(stderr, "    Done\n");
-
-    /* can do better. Jus replicating IDR R style coding */
-    bool flag = true;
     int iter_counter;
     for(iter_counter=0;;iter_counter++)
     {
-        mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
-            x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
+        estimate_marginals(x, breaks, 
+                           x1_pdf, x2_pdf, 
+                           x1_cdf, x2_cdf, 
+                           ez, p0);
+        estimate_marginals(y, breaks, 
+                           y1_pdf, y2_pdf, 
+                           y1_cdf, y2_cdf, 
+                           ez, p0);
+
+        mstep_gaussian(&p0, &rho, x1_cdf, y1_cdf, ez);
 
         double l = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
             y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
