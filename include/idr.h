@@ -409,20 +409,12 @@ void em_gaussian(
     likelihood.push_back(li);
     fprintf(stderr, "    Done\n");
 
-    bool flag = true;
-    int i = 1;
-
     /* can do better. Jus replicating IDR R style coding */
-    int iter_counter = 1;
+    bool flag = true;
+    int i = 0;
+    int iter_counter = 0;
     while(flag)
     {
-        estep_gaussian(x1_pdf.size(),
-                       x1_pdf.data(), x2_pdf.data(), 
-                       x1_cdf.data(), x2_cdf.data(),
-                       y1_pdf.data(), y2_pdf.data(), 
-                       y1_cdf.data(), y2_cdf.data(), 
-                       ez.data(), p0, rho);
-
         mstep_gaussian(x, y, breaks, &p0, &rho, x1_pdf, x2_pdf,
             x1_cdf, x2_cdf, y1_pdf, y2_pdf, y1_cdf, y2_cdf, ez);
 
@@ -443,6 +435,13 @@ void em_gaussian(
         }
         i++;
         iter_counter++;
+
+        estep_gaussian(x1_pdf.size(),
+                       x1_pdf.data(), x2_pdf.data(), 
+                       x1_cdf.data(), x2_cdf.data(),
+                       y1_pdf.data(), y2_pdf.data(), 
+                       y1_cdf.data(), y2_cdf.data(), 
+                       ez.data(), p0, rho);
     }
     vector<double> temp(ez.size());
     for(int i=0; i<ez.size(); ++i)
