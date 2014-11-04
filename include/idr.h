@@ -324,15 +324,18 @@ void estimate_marginals(
 
 void mstep_gaussian(
     double* p0, double* rho,
-    vector<double>& x1_cdf, 
-    vector<double>& y1_cdf,
-    vector<double>& ez)
+    size_t n_samples,
+    double* x1_cdf, 
+    double* y1_cdf,
+    double* ez)
 {
     *rho = maximum_likelihood(
-        x1_cdf.size(), x1_cdf.data(), y1_cdf.data(), ez.data());
+        n_samples, x1_cdf, y1_cdf, ez);
 
-    double sum_ez = accumulate(ez.begin(), ez.end(), 0.0);
-    *p0 = sum_ez/(double)ez.size();
+    double sum_ez = 0;
+    for(int i = 0; i < n_samples; i++)
+    { sum_ez += ez[i]; }
+    *p0 = sum_ez/(double)n_samples;
 }
 
 
@@ -340,39 +343,35 @@ void em_gaussian(
     vector<float>& x, vector<float>& y,
     vector< pair<int, double> >& idrLocal)
 {
-    vector<double> ez( x.size() );
+    size_t n_samples = x.size();
+    size_t n_bins = 50;
+    vector<double> ez( n_samples );
 
-    int mid = round((float) x.size()/2);
+    int mid = round((float) n_samples/2);
 
     fill(ez.begin(), ez.begin()+mid, 0.9);
     fill(ez.begin()+mid, ez.end(), 0.1);
 
-    float bin_width = (float)(x.size()-1)/50;
+    float bin_width = (float)(n_samples-1)/n_bins;
 
     double p0 = 0.5;
     double rho = 0.0;
     double eps = 0.01;
 
     /* Breaks for binning the data */
-    vector<double> breaks(51);
-    for(int i=0; i<breaks.size(); ++i)
+    vector<double> breaks(n_bins+1);
+    breaks[0] = (double)1-bin_width/(2*n_bins);
+    for(int i=1; i<(n_bins+1); ++i)
     {
-        if (i == 0)
-        {
-            breaks[i] = (double)1-bin_width/100;
-        }
-        else
-        {
-            breaks[i] = breaks[i-1] + (double)(x.size()-1+bin_width/50)/50;
-        }
+        breaks[i] = breaks[i-1] + (double)(n_samples-1+bin_width/n_bins)/n_bins;
     }
 
     /*
      * CDF and PDF vectors for the input vectors.
      * Updated everytime for a EM iteration.
      */
-    vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size());
-    vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size());
+    vector<double> x1_pdf(n_samples), x2_pdf(n_samples), x1_cdf(n_samples);
+    vector<double> y1_pdf(n_samples), y2_pdf(n_samples), y1_cdf(n_samples);
     
     /* Likelihood vector */
     vector<double> likelihood;
@@ -389,7 +388,8 @@ void em_gaussian(
                            y1_cdf, 
                            ez, p0);
 
-        mstep_gaussian(&p0, &rho, x1_cdf, y1_cdf, ez);
+        mstep_gaussian(&p0, &rho, n_samples, 
+                       x1_cdf.data(), y1_cdf.data(), ez.data());
 
         estep_gaussian(x1_pdf.size(),
                        x1_pdf.data(), x2_pdf.data(), 
