@@ -282,22 +282,25 @@ void estimate_marginals(
     double* bin_dens_1 = (double*) calloc(sizeof(double), nbins);
     double* bin_cumsum_1 = (double*) calloc(sizeof(double), nbins);
     double* bin_dens_2 = (double*) calloc(sizeof(double), nbins);
+
+    /* total probability mass  */
+    double sum_ez = 0;
+    double sum_ez_comp = 0;
     for(int i=0; i<n_samples; ++i)
     {
         int bin_i = input[i]/((n_samples+1)/nbins);
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);
+        
+    /* adding a pseudo count of 1 to each bin to prevent divide by zero */
+        sum_ez += bin_dens_1[i] + 1;
+        sum_ez_comp += bin_dens_2[i] + 1;
+
     }
 
-    /* normalize the bin counts, adding 1 pseudo count to each 
-       bin to prevent divide by zero */
-    double sum_ez = 0;
-    double sum_ez_comp = 0;
     /*we don't use the 1- relation to make the result more numerically stable*/
     for(i=0; i<nbins; ++i)
     {
-        sum_ez += bin_dens_1[i] + 1;
-        sum_ez_comp += bin_dens_2[i] + 1;
     }
     
     double cumsum = 0;
