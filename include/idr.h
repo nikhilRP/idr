@@ -235,6 +235,7 @@ void estep_gaussian(
 
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
+    size_t n_samples,
     vector<float>& input, 
     vector<double>& breaks,
     vector<double>& pdf_1, 
@@ -244,7 +245,6 @@ void estimate_marginals(
     vector<double>& ez, 
     double p)
 {
-    size_t n_samples = input.size();
     int nbins = breaks.size() - 1;
 
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
@@ -379,11 +379,11 @@ void em_gaussian(
     int iter_counter;
     for(iter_counter=0;;iter_counter++)
     {
-        estimate_marginals(x, breaks, 
+        estimate_marginals(n_samples, x, breaks, 
                            x1_pdf, x2_pdf, 
                            x1_cdf, 
                            ez, p0);
-        estimate_marginals(y, breaks, 
+        estimate_marginals(n_samples, y, breaks, 
                            y1_pdf, y2_pdf, 
                            y1_cdf, 
                            ez, p0);
@@ -391,12 +391,13 @@ void em_gaussian(
         mstep_gaussian(&p0, &rho, n_samples, 
                        x1_cdf.data(), y1_cdf.data(), ez.data());
 
-        estep_gaussian(x1_pdf.size(),
+        estep_gaussian(n_samples,
                        x1_pdf.data(), x2_pdf.data(), 
                        x1_cdf.data(), 
                        y1_pdf.data(), y2_pdf.data(), 
                        y1_cdf.data(), 
-                       ez.data(), p0, rho);
+                       ez.data(), 
+                       p0, rho);
 
         double l = gaussian_loglikelihood(
             x1_pdf, x2_pdf, x1_cdf, 
