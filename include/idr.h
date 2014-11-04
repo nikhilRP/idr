@@ -271,24 +271,12 @@ void estimate_marginals(
     /* the estimated mixture paramater for each point */
     double* ez, 
     
-    size_t nbins,
-    
-    /* the global mixture param */
-    double p)
+    size_t nbins)
 {
     /* counter we will use throughout the script */
     int i;
     
     const double bin_width = ((double)n_samples)/nbins;
-    double* breaks = (double*) calloc(sizeof(double), (nbins+1));
-    /* make this a little smaller to avoid rounding errors */
-    breaks[0] = 0. - 1e-6;
-    for(i=1; i<(nbins+1); ++i)
-    {
-        breaks[i] = i*bin_width;
-    }
-    /* to avoid rounding errors */
-    breaks[nbins] += 1e-6;
         
     /* bin the observations */
     double* bin_dens_1 = (double*) calloc(sizeof(double), nbins);
@@ -296,7 +284,7 @@ void estimate_marginals(
     double* bin_dens_2 = (double*) calloc(sizeof(double), nbins);
     for(int i=0; i<n_samples; ++i)
     {
-        int bin_i = bsearch(input[i], breaks, nbins);
+        int bin_i = input[i]/((n_samples+1)/nbins);
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);
     }
@@ -324,7 +312,7 @@ void estimate_marginals(
 
     for(i=0; i<n_samples; ++i)
     {
-        int bin_i = bsearch(input[i], breaks, nbins);
+        int bin_i = input[i]/((n_samples+1)/nbins);
         pdf_1[i] = bin_dens_1[bin_i];
         pdf_2[i] = bin_dens_2[bin_i];
         cdf_1[i] = bin_cumsum_1[bin_i];
@@ -333,7 +321,6 @@ void estimate_marginals(
     free(bin_dens_1);
     free(bin_dens_2);
     free(bin_cumsum_1);
-    free(breaks);
 }
 
 void mstep_gaussian(
@@ -397,13 +384,12 @@ void em_gaussian(
         estimate_marginals(n_samples, x, 
                            x1_pdf, x2_pdf, x1_cdf, 
                            ez,
-                           n_bins, 
-                           p0);
+                           n_bins );
+    
         estimate_marginals(n_samples, y, 
                            y1_pdf, y2_pdf, y1_cdf, 
                            ez,
-                           n_bins, 
-                           p0);
+                           n_bins );
 
         mstep_gaussian(&p0, &rho, n_samples, 
                        x1_cdf, y1_cdf, ez);
