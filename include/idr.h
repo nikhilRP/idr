@@ -259,7 +259,7 @@ size_t bsearch(
         else
             hi = mid;
     }
-    return hi;
+    return lo;
 }
 
 /* use a histogram estimator to estimate the marginal distributions */
@@ -277,91 +277,64 @@ void estimate_marginals(
     /* the global mixture param */
     double p)
 {
+    /* counter we will use throughout the script */
+    int i;
+    
     const double bin_width = ((double)n_samples)/nbins;
-    double* breaks = (double*) alloca(sizeof(double)*(nbins+1));
+    double* breaks = (double*) calloc(sizeof(double), (nbins+1));
     /* make this a little smaller to avoid rounding errors */
     breaks[0] = 0. - 1e-6;
-    for(int i=1; i<(nbins+1); ++i)
+    for(i=1; i<(nbins+1); ++i)
     {
         breaks[i] = i*bin_width;
     }
     /* to avoid rounding errors */
     breaks[nbins] += 1e-6;
-    
-    double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
-    double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
-    double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
-    
-    /* estimate the weighted signal fraction and noise fraction sums */
-    double sum_ez = 0;
-    for(int i=0; i<n_samples; ++i)
-        sum_ez += ez[i];
-    double dup_sum_ez = n_samples - sum_ez;
-
-    /* find which bin each value corresponds to, and 
-       set this to the correct value */
-    for(int i=0; i<n_samples; ++i)
-    {
-        double val = (double) bsearch(input[i], breaks, nbins);
-        cdf_1[i] = val;
-        pdf_1[i] = val;
-        pdf_2[i] = val;
-    }
-
-    /* scale factor for the histogram estimator - I have no idea where this is 
-       coming from or what the point is */
-    const double scale = ((n_samples+nbins)/(bin_width*(n_samples+nbins+1.0)));
-    /* for each bin, estimate the total probability
-       mass from the items that fall into this bin */
-    for(int k=0; k<nbins; ++k)
-    {
-        double sum_1 = 0.0;
-        double sum_2 = 0.0;
-        for(int m=0; m<n_samples; ++m)
-        {
-            if(cdf_1[m] == k+1)
-            {
-                sum_1 = sum_1 + ez[m];
-                sum_2 = sum_2 + (1.0 - ez[m]);
-            }
-        }
         
-        temp_pdf_1[k] = scale*(sum_1 + 1)/(sum_ez + nbins);
-        temp_pdf_2[k] = scale*(sum_2 + 1)/(dup_sum_ez + nbins);
-
-        for(int m=0; m<n_samples; ++m)
-        {
-            if(pdf_1[m] == k+1)
-                pdf_1[m] = temp_pdf_1[k];
-            if(pdf_2[m] == k+1)
-                pdf_2[m] = temp_pdf_2[k];
-        }
-
-        temp_cdf_1[k] = temp_pdf_1[k] * bin_width;
-    }
-
-    double* new_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
-
-    new_cdf_1[0] = 0.0;
-
-    // Naive sequential scan
-    for(int p=1; p<nbins; ++p)
+    /* bin the observations */
+    double* bin_dens_1 = (double*) calloc(sizeof(double), nbins);
+    double* bin_cumsum_1 = (double*) calloc(sizeof(double), nbins);
+    double* bin_dens_2 = (double*) calloc(sizeof(double), nbins);
+    for(int i=0; i<n_samples; ++i)
     {
-        new_cdf_1[p] = temp_cdf_1[p-1] + new_cdf_1[p-1];
-        printf("%e\t%e\t%e\n", temp_pdf_1[p], temp_pdf_2[p], new_cdf_1[p]);
-    }
-    exit(0);
-    for(int l=0; l<n_samples; ++l)
-    {
-        int i = lroundf(cdf_1[l]);
-        double b = input[l] - breaks[i-1];
-        cdf_1[l] = new_cdf_1[i-1] + temp_pdf_1[i-1] * b;
+        int bin_i = bsearch(input[i], breaks, nbins);
+        bin_dens_1[bin_i] += ez[i];
+        bin_dens_2[bin_i] += (1-ez[i]);
     }
 
-    free(temp_pdf_1);
-    free(temp_pdf_2);
-    free(temp_cdf_1);
-    free(new_cdf_1);
+    /* normalize the bin counts, adding 1 pseudo count to each 
+       bin to prevent divide by zero */
+    double sum_ez = 0;
+    double sum_ez_comp = 0;
+    /*we don't use the 1- relation to make the result more numerically stable*/
+    for(i=0; i<nbins; ++i)
+    {
+        sum_ez += bin_dens_1[i] + 1;
+        sum_ez_comp += bin_dens_2[i] + 1;
+    }
+    
+    double cumsum = 0;
+    for(i=0; i<nbins; ++i)
+    {
+        double prev_cumsum = cumsum;
+        cumsum += (bin_dens_1[i]+1)/sum_ez;
+        bin_cumsum_1[i] = (cumsum + prev_cumsum)/2.;
+        bin_dens_1[i] = (bin_dens_1[i]+1)/(bin_width*sum_ez);
+        bin_dens_2[i] = (bin_dens_2[i]+1)/(bin_width*sum_ez_comp);
+    }
+
+    for(i=0; i<n_samples; ++i)
+    {
+        int bin_i = bsearch(input[i], breaks, nbins);
+        pdf_1[i] = bin_dens_1[bin_i];
+        pdf_2[i] = bin_dens_2[bin_i];
+        cdf_1[i] = bin_cumsum_1[bin_i];
+    }
+
+    free(bin_dens_1);
+    free(bin_dens_2);
+    free(bin_cumsum_1);
+    free(breaks);
 }
 
 void mstep_gaussian(
@@ -403,7 +376,6 @@ void em_gaussian(
 
     /* Initialize the set of break points for the histogram averaging */
     size_t n_bins = 50;
-    float bin_width = (float)(n_samples-1)/n_bins;
     
     /*
      * CDF and PDF vectors for the input vectors.
@@ -412,6 +384,7 @@ void em_gaussian(
     double* x1_pdf = (double*) calloc(sizeof(double), n_samples);
     double* x2_pdf = (double*) calloc(sizeof(double), n_samples);
     double* x1_cdf = (double*) calloc(sizeof(double), n_samples);
+    
     double* y1_pdf = (double*) calloc(sizeof(double), n_samples);
     double* y2_pdf = (double*) calloc(sizeof(double), n_samples);
     double* y1_cdf = (double*) calloc(sizeof(double), n_samples);
@@ -435,7 +408,7 @@ void em_gaussian(
 
         mstep_gaussian(&p0, &rho, n_samples, 
                        x1_cdf, y1_cdf, ez);
-
+        
         estep_gaussian(n_samples,
                        x1_pdf, x2_pdf, 
                        x1_cdf, 
