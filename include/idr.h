@@ -241,6 +241,27 @@ void estep_gaussian(
     free(density_c1);
 }
 
+/*
+ * Basic Binary search
+ */
+size_t bsearch(
+    double key,
+    double* D,
+    size_t n)
+{
+    int lo = 0;
+    int hi = n;
+    unsigned int mid;
+    while (hi - lo > 1) {
+        mid = (hi + lo) / 2;
+        if ( D[mid] < key )
+            lo = mid;
+        else
+            hi = mid;
+    }
+    return hi;
+}
+
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
     size_t n_samples,
@@ -252,11 +273,18 @@ void estimate_marginals(
     double* ez, 
     
     size_t nbins,
-    vector<double>& breaks,
     
     /* the global mixture param */
     double p)
 {
+    const double bin_width = (n_samples-1)/nbins;
+    double* breaks = (double*) alloca(sizeof(double)*(nbins+1));
+    breaks[0] = (double)1-bin_width/(2.*nbins);
+    for(int i=1; i<(nbins+1); ++i)
+    {
+        breaks[i] = breaks[i-1] + (double)(n_samples-1+bin_width/nbins)/nbins;
+    }
+
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
@@ -265,9 +293,7 @@ void estimate_marginals(
        set this to the correct value */
     for(int i=0; i<n_samples; ++i)
     {
-        std::vector<double>::iterator low = lower_bound(
-            breaks.begin(), breaks.end(), (double)input[i]);
-        double val = low - breaks.begin();
+        double val = (double) bsearch(input[i], breaks, nbins);
         cdf_1[i] = val;
         pdf_1[i] = val;
         pdf_2[i] = val;
@@ -281,7 +307,6 @@ void estimate_marginals(
 
     /* scale factor for the histogram estimator - I have no idea where this is 
        coming from or what the point is */
-    const double bin_width = (n_samples-1)/nbins;
     const double scale = ((n_samples+nbins)/(bin_width*(n_samples+nbins+1.0)));
     /* for each bin, estimate the total probability
        mass from the items that fall into this bin */
@@ -375,14 +400,7 @@ void em_gaussian(
     /* Initialize the set of break points for the histogram averaging */
     size_t n_bins = 50;
     float bin_width = (float)(n_samples-1)/n_bins;
-
-    vector<double> breaks(n_bins+1);
-    breaks[0] = (double)1-bin_width/(2*n_bins);
-    for(int i=1; i<(n_bins+1); ++i)
-    {
-        breaks[i] = breaks[i-1] + (double)(n_samples-1+bin_width/n_bins)/n_bins;
-    }
-
+    
     /*
      * CDF and PDF vectors for the input vectors.
      * Updated everytime for a EM iteration.
@@ -403,12 +421,12 @@ void em_gaussian(
         estimate_marginals(n_samples, x, 
                            x1_pdf, x2_pdf, x1_cdf, 
                            ez,
-                           n_bins, breaks, 
+                           n_bins, 
                            p0);
         estimate_marginals(n_samples, y, 
                            y1_pdf, y2_pdf, y1_cdf, 
                            ez,
-                           n_bins, breaks,
+                           n_bins, 
                            p0);
 
         mstep_gaussian(&p0, &rho, n_samples, 
