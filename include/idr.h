@@ -191,9 +191,9 @@ double maximum_likelihood(
 
 double gaussian_loglikelihood(
     vector<double>& x1_pdf, vector<double>& x2_pdf,
-    vector<double>& x1_cdf, vector<double>& x2_cdf,
+    vector<double>& x1_cdf, 
     vector<double>& y1_pdf, vector<double>& y2_pdf,
-    vector<double>& y1_cdf, vector<double>& y2_cdf,
+    vector<double>& y1_cdf, 
     double p, double rho)
 {
     vector<double> density_c1( x1_pdf.size() );
@@ -211,9 +211,9 @@ double gaussian_loglikelihood(
 void estep_gaussian(
     size_t n_samples,
     double* x1_pdf, double* x2_pdf,
-    double* x1_cdf, double* x2_cdf,
+    double* x1_cdf, 
     double* y1_pdf, double* y2_pdf,
-    double* y1_cdf, double* y2_cdf,
+    double* y1_cdf, 
     double* ez, double p, double rho)
 
 {
@@ -240,7 +240,6 @@ void estimate_marginals(
     vector<double>& pdf_1, 
     vector<double>& pdf_2,
     vector<double>& cdf_1, 
-    vector<double>& cdf_2,
     /* the estimated mixture paramater for each point */
     vector<double>& ez, 
     double p)
@@ -249,7 +248,6 @@ void estimate_marginals(
     int nbins = breaks.size() - 1;
 
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
-    double* temp_cdf_2 = (double*) calloc(nbins, sizeof(double));
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
     
@@ -263,7 +261,6 @@ void estimate_marginals(
     int first_size = round((double)(n_samples*p));
     double bin_width = breaks[1] - breaks[0];
     
-    cdf_2 = cdf_1;
     pdf_1 = cdf_1;
     pdf_2 = cdf_1;
 
@@ -300,20 +297,16 @@ void estimate_marginals(
         }
 
         temp_cdf_1[k] = temp_pdf_1[k] * bin_width;
-        temp_cdf_2[k] = temp_pdf_2[k] * bin_width;
     }
 
     double* new_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
-    double* new_cdf_2 = (double*) calloc(nbins, sizeof(double)); 
 
     new_cdf_1[0] = 0.0;
-    new_cdf_2[0] = 0.0;
 
     // Naive sequential scan
     for(int p=1; p<nbins; ++p)
     {
         new_cdf_1[p] = temp_cdf_1[p-1] + new_cdf_1[p-1];
-        new_cdf_2[p] = temp_cdf_2[p-1] + new_cdf_2[p-1];
     }
 
     for(int l=0; l<n_samples; ++l)
@@ -321,15 +314,12 @@ void estimate_marginals(
         int i = lroundf(cdf_1[l]);
         double b = input[l] - breaks[i-1];
         cdf_1[l] = new_cdf_1[i-1] + temp_pdf_1[i-1] * b;
-        cdf_2[l] = new_cdf_2[i-1] + temp_pdf_2[i-1] * b;
     }
 
     free(temp_pdf_1);
     free(temp_pdf_2);
     free(temp_cdf_1);
-    free(temp_cdf_2);
     free(new_cdf_1);
-    free(new_cdf_2);
 }
 
 void mstep_gaussian(
@@ -381,8 +371,8 @@ void em_gaussian(
      * CDF and PDF vectors for the input vectors.
      * Updated everytime for a EM iteration.
      */
-    vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size()), x2_cdf(x.size());
-    vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size()), y2_cdf(x.size());
+    vector<double> x1_pdf(x.size()), x2_pdf(x.size()), x1_cdf(x.size());
+    vector<double> y1_pdf(x.size()), y2_pdf(x.size()), y1_cdf(x.size());
     
     /* Likelihood vector */
     vector<double> likelihood;
@@ -392,17 +382,27 @@ void em_gaussian(
     {
         estimate_marginals(x, breaks, 
                            x1_pdf, x2_pdf, 
-                           x1_cdf, x2_cdf, 
+                           x1_cdf, 
                            ez, p0);
         estimate_marginals(y, breaks, 
                            y1_pdf, y2_pdf, 
-                           y1_cdf, y2_cdf, 
+                           y1_cdf, 
                            ez, p0);
 
         mstep_gaussian(&p0, &rho, x1_cdf, y1_cdf, ez);
 
-        double l = gaussian_loglikelihood(x1_pdf, x2_pdf, x1_cdf, x2_cdf,
-            y1_pdf, y2_pdf, y1_cdf, y2_cdf, p0, rho);
+        estep_gaussian(x1_pdf.size(),
+                       x1_pdf.data(), x2_pdf.data(), 
+                       x1_cdf.data(), 
+                       y1_pdf.data(), y2_pdf.data(), 
+                       y1_cdf.data(), 
+                       ez.data(), p0, rho);
+
+        double l = gaussian_loglikelihood(
+            x1_pdf, x2_pdf, x1_cdf, 
+            y1_pdf, y2_pdf, y1_cdf, 
+            p0, rho);
+        
         likelihood.push_back(l);
         printf("%i\t%e\n", iter_counter, l);
         
@@ -417,12 +417,6 @@ void em_gaussian(
             { break; }
         }
 
-        estep_gaussian(x1_pdf.size(),
-                       x1_pdf.data(), x2_pdf.data(), 
-                       x1_cdf.data(), x2_cdf.data(),
-                       y1_pdf.data(), y2_pdf.data(), 
-                       y1_cdf.data(), y2_cdf.data(), 
-                       ez.data(), p0, rho);
     }
     
     vector<double> temp(ez.size());
