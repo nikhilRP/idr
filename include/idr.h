@@ -279,10 +279,14 @@ void estimate_marginals(
 {
     const double bin_width = (n_samples-1)/nbins;
     double* breaks = (double*) alloca(sizeof(double)*(nbins+1));
-    breaks[0] = (double)1-bin_width/(2.*nbins);
+    breaks[0] = (double)1-(n_samples-1)/(2.*nbins*nbins);
     for(int i=1; i<(nbins+1); ++i)
     {
-        breaks[i] = breaks[i-1] + (double)(n_samples-1+bin_width/nbins)/nbins;
+        breaks[i] = breaks[i-1] + (double)(
+            n_samples
+            -1
+            +(n_samples-1)/(nbins*nbins)
+        )/nbins;
     }
 
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
