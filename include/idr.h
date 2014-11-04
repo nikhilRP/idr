@@ -277,18 +277,15 @@ void estimate_marginals(
     /* the global mixture param */
     double p)
 {
-    const double bin_width = (n_samples-1)/nbins;
+    const double bin_width = ((double)n_samples)/nbins;
     double* breaks = (double*) alloca(sizeof(double)*(nbins+1));
-    breaks[0] = (double)1-(n_samples-1)/(2.*nbins*nbins);
+    breaks[0] = 0. - 1e-6;
     for(int i=1; i<(nbins+1); ++i)
     {
-        breaks[i] = breaks[i-1] + (double)(
-            n_samples
-            -1
-            +(n_samples-1)/(nbins*nbins)
-        )/nbins;
+        breaks[i] = i*bin_width;
     }
-
+    breaks[nbins] += 1e-6;
+    
     double* temp_cdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_1 = (double*) calloc(nbins, sizeof(double)); 
     double* temp_pdf_2 = (double*) calloc(nbins, sizeof(double));
