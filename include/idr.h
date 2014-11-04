@@ -190,21 +190,29 @@ double maximum_likelihood(
 }
 
 double gaussian_loglikelihood(
-    vector<double>& x1_pdf, vector<double>& x2_pdf,
-    vector<double>& x1_cdf, 
-    vector<double>& y1_pdf, vector<double>& y2_pdf,
-    vector<double>& y1_cdf, 
+    size_t n_samples,
+    
+    double*  x1_pdf, 
+    double*  x2_pdf,
+    double*  x1_cdf, 
+    
+    double*  y1_pdf, 
+    double*  y2_pdf,
+    double*  y1_cdf, 
+    
     double p, double rho)
 {
-    vector<double> density_c1( x1_pdf.size() );
+    double* density_c1 = (double*) calloc( sizeof(double), n_samples );
     double l0 = 0.0;
 
-    calculate_quantiles(rho, x1_cdf.size(), 
-                        x1_cdf.data(), y1_cdf.data(), density_c1.data());
-    for(int i=0; i<density_c1.size(); ++i)
+    calculate_quantiles(rho, n_samples, x1_cdf, y1_cdf, density_c1);
+    for(int i=0; i<n_samples; ++i)
     {
-        l0 = l0 + log(p * density_c1[i] * x1_pdf[i] * y1_pdf[i] + (1.0 - p) * 1.0 * x2_pdf[i] * y2_pdf[i]);
+        /* BUG XXX shouldnt line 2 be (1.0-p)*1.0*x2_pdf[i]*y2_pdf[i]) */
+        l0 = l0 + log(p*density_c1[i]*x1_pdf[i]*y1_pdf[i] 
+                      + (1.0-p)*1.0*x2_pdf[i]*y2_pdf[i]);
     }
+    free(density_c1);
     return l0;
 }
 
@@ -372,8 +380,12 @@ void em_gaussian(
      * CDF and PDF vectors for the input vectors.
      * Updated everytime for a EM iteration.
      */
-    vector<double> x1_pdf(n_samples), x2_pdf(n_samples), x1_cdf(n_samples);
-    vector<double> y1_pdf(n_samples), y2_pdf(n_samples), y1_cdf(n_samples);
+    double* x1_pdf = (double*) calloc(sizeof(double), n_samples);
+    double* x2_pdf = (double*) calloc(sizeof(double), n_samples);
+    double* x1_cdf = (double*) calloc(sizeof(double), n_samples);
+    double* y1_pdf = (double*) calloc(sizeof(double), n_samples);
+    double* y2_pdf = (double*) calloc(sizeof(double), n_samples);
+    double* y1_cdf = (double*) calloc(sizeof(double), n_samples);
     
     /* Likelihood vector */
     vector<double> likelihood;
@@ -382,28 +394,29 @@ void em_gaussian(
     for(iter_counter=0;;iter_counter++)
     {
         estimate_marginals(n_samples, x.data(), 
-                           x1_pdf.data(), x2_pdf.data(), x1_cdf.data(), 
+                           x1_pdf, x2_pdf, x1_cdf, 
                            ez.data(),
                            n_bins, breaks, 
                            p0);
         estimate_marginals(n_samples, y.data(), 
-                           y1_pdf.data(), y2_pdf.data(), y1_cdf.data(), 
+                           y1_pdf, y2_pdf, y1_cdf, 
                            ez.data(),
                            n_bins, breaks,
                            p0);
 
         mstep_gaussian(&p0, &rho, n_samples, 
-                       x1_cdf.data(), y1_cdf.data(), ez.data());
+                       x1_cdf, y1_cdf, ez.data());
 
         estep_gaussian(n_samples,
-                       x1_pdf.data(), x2_pdf.data(), 
-                       x1_cdf.data(), 
-                       y1_pdf.data(), y2_pdf.data(), 
-                       y1_cdf.data(), 
+                       x1_pdf, x2_pdf, 
+                       x1_cdf, 
+                       y1_pdf, y2_pdf, 
+                       y1_cdf, 
                        ez.data(), 
                        p0, rho);
 
         double l = gaussian_loglikelihood(
+            n_samples,
             x1_pdf, x2_pdf, x1_cdf, 
             y1_pdf, y2_pdf, y1_cdf, 
             p0, rho);
