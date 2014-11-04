@@ -317,17 +317,12 @@ void estimate_marginals(
     double cumsum = 0;
     for(i=0; i<nbins; ++i)
     {
-        bin_dens_1[i] = (bin_dens_1[i]+1)/sum_ez;
+        bin_dens_1[i] = (bin_dens_1[i]+1)/(bin_width*sum_ez);
         cumsum += bin_dens_1[i];
         bin_cumsum_1[i] = cumsum;
-        bin_dens_2[i] = (bin_dens_2[i]+1)/sum_ez_comp;
-        /*
-        printf("%e\t%e\t%e\t%e\t%e\n", 
-               bin_dens_1[i], bin_dens_2[i], bin_cumsum_1[i], 
-               sum_ez, sum_ez_comp);
-        */
+        bin_dens_2[i] = (bin_dens_2[i]+1)/(bin_width*sum_ez_comp);
     }
-        
+    
     for(i=0; i<n_samples; ++i)
     {
         int bin_i = bsearch(input[i], breaks, nbins);
