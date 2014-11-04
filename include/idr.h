@@ -272,7 +272,7 @@ void estimate_marginals(
         pdf_1[i] = val;
         pdf_2[i] = val;
     }
-    double bin_width = breaks[1] - breaks[0];
+    double bin_width = (n_samples-1)/nbins;
     
     /* estimate the weighted signal fraction and noise fraction sums */
     double sum_ez = 0;
