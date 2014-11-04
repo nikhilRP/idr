@@ -272,7 +272,6 @@ void estimate_marginals(
         pdf_1[i] = val;
         pdf_2[i] = val;
     }
-    double bin_width = (n_samples-1)/nbins;
     
     /* estimate the weighted signal fraction and noise fraction sums */
     double sum_ez = 0;
@@ -282,7 +281,8 @@ void estimate_marginals(
 
     /* scale factor for the histogram estimator - I have no idea where this is 
        coming from or what the point is */
-    double scale = ((n_samples+nbins)/(bin_width*(n_samples+nbins+1.0)));
+    const double bin_width = (n_samples-1)/nbins;
+    const double scale = ((n_samples+nbins)/(bin_width*(n_samples+nbins+1.0)));
     /* for each bin, estimate the total probability
        mass from the items that fall into this bin */
     for(int k=0; k<nbins; ++k)
