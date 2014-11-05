@@ -18,7 +18,7 @@ set(MYLIB_BRIEF "${MYLIB_NAME} is a C++ implementation of Irreproducible Discove
 set(GCOV_FLAGS "-fprofile-arcs -ftest-coverage")
 
 set(DEBUG_FLAGS "-g -O0 -Wall")
-set(RELEASE_FLAGS "-O3")
+set(RELEASE_FLAGS "-O4 -DNDEBUG")
 
 set(CMAKE_CXX_FLAGS ${RELEASE_FLAGS})
 set(CMAKE_C_FLAGS ${RELEASE_FLAGS})

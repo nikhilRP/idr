@@ -12,6 +12,7 @@
 #include <cmath>
 #include <float.h>
 #include <numeric>
+#include <cassert>
 
 using namespace std;
 
@@ -218,26 +219,68 @@ double gaussian_loglikelihood(
 void estep_gaussian(
     size_t n_samples,
     double* x1_pdf, double* x2_pdf,
-    double* x1_cdf, 
+    double* x1_cdf, double* x2_cdf, 
     double* y1_pdf, double* y2_pdf,
-    double* y1_cdf, 
+    double* y1_cdf, double* y2_cdf, 
     double* ez, double p, double rho)
 
 {
     /* update density_c1 */
     double* density_c1 = (double*) calloc( sizeof(double), n_samples );
     calculate_quantiles(rho, n_samples, x1_cdf, y1_cdf, density_c1);
-    
+
+    /*
+      In genreal for a mixture of two gaussians we would need to 
+      do the following but, since the second gaussian has correlation
+      0, then density_c2[i] is 1 for all i.
+      
+      double* density_c2 = (double*) calloc( sizeof(double), n_samples );
+      calculate_quantiles(0, n_samples, x2_cdf, y2_cdf, density_c2);
+    */
     for(int i=0; i<n_samples; ++i)
     {
-        /* XXX BUG? Shouldn't the last line be 
-           ... +(1-p)*(1-density_c1[i])*x2_pdf[i]*y2_pdf[i]) */
-        ez[i] = p * density_c1[i] * x1_pdf[i] * y1_pdf[i] 
-            / (p * density_c1[i] * x1_pdf[i] * y1_pdf[i] 
-               + (1-p) * 1 * x2_pdf[i] * y2_pdf[i]);
+        /* Technically this shoudl be  
+           ... +(1-p)*(1-density_c1[i])*x2_pdf[i]*y2_pdf[i]) 
+        but since hte noise component has correlation 0,
+        density_c2[i] is always 1.0
+        */
+        double numerator = p * density_c1[i] * x1_pdf[i] * y1_pdf[i];
+        double denominator = numerator + (1-p) * 1.0 * x2_pdf[i] * y2_pdf[i];
+        ez[i] = numerator/denominator;
+        assert( !isnan(ez[i]) );
     }
 
     free(density_c1);
+    // we don't use this - see above
+    // free(density_c2);
+}
+
+/* build the properly normalized cumsum array for bin_dens,
+   store it into bin_cumsum, and return the sum */
+double
+build_cumsum(size_t nbins, double* bin_dens, double* bin_cumsum)
+{
+    /* normalize the bin counts */
+    double cumsum = 0;
+    int i;
+    for(i=0; i<nbins; ++i)
+    {
+        cumsum += bin_dens[i];
+        bin_cumsum[i] = cumsum;
+    }
+    
+    double sum_ez = cumsum;
+    cumsum = 0;
+    for( i=0; i<nbins; i++ )
+    {
+        double prev_cumsum = cumsum;
+        cumsum = bin_cumsum[i];
+        bin_cumsum[i] = (cumsum + prev_cumsum)/(2.*sum_ez);
+        assert( !isnan(bin_cumsum[i]));
+        assert( 0 < bin_cumsum[i] &&  bin_cumsum[i] < 1);
+    }
+
+    return sum_ez;
 }
 
 /* use a histogram estimator to estimate the marginal distributions */
@@ -247,6 +290,8 @@ void estimate_marginals(
     double* pdf_1, 
     double* pdf_2,
     double* cdf_1, 
+    double* cdf_2, 
+
     /* the estimated mixture paramater for each point */
     double* ez, 
     
@@ -254,50 +299,50 @@ void estimate_marginals(
 {
     /* counter we will use throughout the script */
     int i;
-    
-    const double bin_width = ((double)n_samples)/nbins;
-        
+            
     /* bin the observations */
     double* bin_dens_1 = (double*) calloc(sizeof(double), nbins);
     double* bin_cumsum_1 = (double*) calloc(sizeof(double), nbins);
     double* bin_dens_2 = (double*) calloc(sizeof(double), nbins);
-
-    /* total probability mass  */
-    double sum_ez = nbins;
-    double sum_ez_comp = nbins;
+    double* bin_cumsum_2 = (double*) calloc(sizeof(double), nbins);
+    
     for(int i=0; i<n_samples; ++i)
     {
         int bin_i = input[i]/((n_samples+1)/nbins);
         bin_dens_1[bin_i] += ez[i];
-        bin_dens_2[bin_i] += (1-ez[i]);
-        
-        /* add a pseudo count of 1 to each bin to prevent divide by zero */
-        sum_ez += ez[i];
-        sum_ez_comp += (1-ez[i]);
-    }
-    
-    /* normalize the bin counts */
-    double cumsum = 0;
-    for(i=0; i<nbins; ++i)
-    {
-        double prev_cumsum = cumsum;
-        cumsum += (bin_dens_1[i]+1)/sum_ez;
-        bin_cumsum_1[i] = (cumsum + prev_cumsum)/2.;
-        bin_dens_1[i] = (bin_dens_1[i]+1)/(bin_width*sum_ez);
-        bin_dens_2[i] = (bin_dens_2[i]+1)/(bin_width*sum_ez_comp);
+        bin_dens_2[bin_i] += (1-ez[i]);        
     }
 
+    /* build the cumsum arrays, and return the total sum for each component */
+    double sum_ez = build_cumsum(nbins, bin_dens_1, bin_cumsum_1);
+    double sum_ez_comp = build_cumsum(nbins, bin_dens_2, bin_cumsum_2);
+    
+    /* normalize the bin densities */
+    for(i=0; i<nbins; ++i)
+    {
+        bin_dens_1[i] = bin_dens_1[i]*nbins/(n_samples*sum_ez);
+        assert( !isnan(bin_dens_1[i]));
+        bin_dens_2[i] = bin_dens_2[i]*nbins/(n_samples*sum_ez_comp);
+        assert( !isnan(bin_dens_2[i]));
+    }
+
+    /* set the pdf variables */
     for(i=0; i<n_samples; ++i)
     {
         int bin_i = input[i]/((n_samples+1)/nbins);
         pdf_1[i] = bin_dens_1[bin_i];
         pdf_2[i] = bin_dens_2[bin_i];
         cdf_1[i] = bin_cumsum_1[bin_i];
+        assert( 0 < cdf_1[i] &&  cdf_1[i] < 1);
+        cdf_2[i] = bin_cumsum_2[bin_i];
+        assert( 0 < cdf_2[i] &&  cdf_2[i] < 1);
+
     }
 
     free(bin_dens_1);
     free(bin_dens_2);
     free(bin_cumsum_1);
+    free(bin_cumsum_2);
 }
 
 void mstep_gaussian(
@@ -312,8 +357,10 @@ void mstep_gaussian(
 
     double sum_ez = 0;
     for(int i = 0; i < n_samples; i++)
-    { sum_ez += ez[i]; }
-    *p0 = sum_ez/(double)n_samples;
+    { 
+        sum_ez += ez[i]; 
+    }
+    *p0 = (sum_ez+1)/((double)n_samples+1);
 }
 
 
@@ -347,10 +394,12 @@ void em_gaussian(
     double* x1_pdf = (double*) calloc(sizeof(double), n_samples);
     double* x2_pdf = (double*) calloc(sizeof(double), n_samples);
     double* x1_cdf = (double*) calloc(sizeof(double), n_samples);
+    double* x2_cdf = (double*) calloc(sizeof(double), n_samples);
     
     double* y1_pdf = (double*) calloc(sizeof(double), n_samples);
     double* y2_pdf = (double*) calloc(sizeof(double), n_samples);
     double* y1_cdf = (double*) calloc(sizeof(double), n_samples);
+    double* y2_cdf = (double*) calloc(sizeof(double), n_samples);
     
     /* Likelihood vector */
     double likelihood[3] = {0,0,0};
@@ -359,12 +408,14 @@ void em_gaussian(
     for(iter_counter=0;;iter_counter++)
     {
         estimate_marginals(n_samples, x, 
-                           x1_pdf, x2_pdf, x1_cdf, 
+                           x1_pdf, x2_pdf, 
+                           x1_cdf, x2_cdf,
                            ez,
                            n_bins );
     
         estimate_marginals(n_samples, y, 
-                           y1_pdf, y2_pdf, y1_cdf, 
+                           y1_pdf, y2_pdf, 
+                           y1_cdf, y2_cdf,
                            ez,
                            n_bins );
 
@@ -373,9 +424,9 @@ void em_gaussian(
         
         estep_gaussian(n_samples,
                        x1_pdf, x2_pdf, 
-                       x1_cdf, 
+                       x1_cdf, x2_cdf,
                        y1_pdf, y2_pdf, 
-                       y1_cdf, 
+                       y1_cdf, y2_cdf,
                        ez, 
                        p0, rho);
 
@@ -389,7 +440,9 @@ void em_gaussian(
         likelihood[0] = likelihood[1];
         likelihood[1] = likelihood[2];
         likelihood[2] = l;
-        printf("%i\t%e\n", iter_counter, l);
+        
+        /* print out the likelihood after each iteration */
+        fprintf(stderr, "%i\t%e\n", iter_counter, l);
         
         if (iter_counter > 1)
         {
