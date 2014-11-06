@@ -292,7 +292,7 @@ void estimate_marginals(
     
     for(int i=0; i<n_samples; ++i)
     {
-        int bin_i = input[i]/((n_samples+1)/nbins);
+        int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);        
     }
@@ -313,7 +313,7 @@ void estimate_marginals(
     /* set the pdf variables */
     for(i=0; i<n_samples; ++i)
     {
-        int bin_i = input[i]/((n_samples+1)/nbins);
+        int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
         pdf_1[i] = bin_dens_1[bin_i];
         pdf_2[i] = bin_dens_2[bin_i];
         cdf_1[i] = bin_cumsum_1[bin_i];
