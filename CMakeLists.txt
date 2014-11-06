@@ -16,26 +16,14 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-if (APPLE AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    set(RELEASE_FLAGS "-O4 -DNDEBUG")
-else ()
-    set(RELEASE_FLAGS "-O3")
-endif()
-
-# code coverage options
-set(GCOV_FLAGS "-fprofile-arcs -ftest-coverage")
+set(RELEASE_FLAGS "-O4 -DNDEBUG")
+set(DEBUG_FLAGS "-g -O0 -Wall")
 
 set(CMAKE_CXX_FLAGS ${RELEASE_FLAGS})
 set(CMAKE_C_FLAGS ${RELEASE_FLAGS})
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall ${GCOV_FLAGS}")
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall ${GCOV_FLAGS}")
-
-message(WARNING ${CMAKE_CXX_FLAGS_DEBUG})
-# TODO OP check how this works on multiple configurations generators
-# available configurations in multiple configurations enabled generators
-set(CMAKE_CONFIGURATION_TYPES Debug Release)
-#message("CMAKE_CFG_INTDIR = ${CMAKE_CFG_INTDIR}")
+set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_FLAGS})
+set(CMAKE_C_FLAGS_DEBUG ${DEBUG_FLAGS})
 
 add_subdirectory(src)
 
