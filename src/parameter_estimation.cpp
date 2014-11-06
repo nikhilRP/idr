@@ -31,7 +31,8 @@ void calculate_quantiles(
     double* updated_density
     )
 {
-    for(int i=0; i<n_samples; ++i)
+    int i;
+    for(i=0; i<n_samples; ++i)
     {
         double a = pow(NormalCDFInverse(x_cdf[i]), 2) 
                    + pow(NormalCDFInverse(y_cdf[i]), 2);
@@ -57,7 +58,8 @@ double cost_function(
                         new_density);
 
     double cop_den = 0.0;
-    for(int i=0; i<n_samples; ++i)
+    int i;
+    for(i=0; i<n_samples; ++i)
     {
         cop_den = cop_den + (ez[i] * log(new_density[i]));
     }
@@ -191,7 +193,8 @@ double gaussian_loglikelihood(
     double l0 = 0.0;
 
     calculate_quantiles(rho, n_samples, x1_cdf, y1_cdf, density_c1);
-    for(int i=0; i<n_samples; ++i)
+    int i;
+    for(i=0; i<n_samples; ++i)
     {
         l0 = l0 + log(p*density_c1[i]*x1_pdf[i]*y1_pdf[i] 
                       + (1.0-p)*x2_pdf[i]*y2_pdf[i]);
@@ -221,7 +224,8 @@ void estep_gaussian(
       double* density_c2 = (double*) calloc( sizeof(double), n_samples );
       calculate_quantiles(0, n_samples, x2_cdf, y2_cdf, density_c2);
     */
-    for(int i=0; i<n_samples; ++i)
+    int i;
+    for(i=0; i<n_samples; ++i)
     {
         /* Technically this shoudl be  
            ... +(1-p)*(1-density_c1[i])*x2_pdf[i]*y2_pdf[i]) 
@@ -270,7 +274,7 @@ build_cumsum(size_t nbins, double* bin_dens, double* bin_cumsum)
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
     size_t n_samples,
-    float* input, 
+    double* input, 
     double* pdf_1, 
     double* pdf_2,
     double* cdf_1, 
@@ -290,7 +294,7 @@ void estimate_marginals(
     double* bin_dens_2 = (double*) calloc(sizeof(double), nbins);
     double* bin_cumsum_2 = (double*) calloc(sizeof(double), nbins);
     
-    for(int i=0; i<n_samples; ++i)
+    for(i=0; i<n_samples; ++i)
     {
         int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
         bin_dens_1[bin_i] += ez[i];
@@ -304,9 +308,9 @@ void estimate_marginals(
     /* normalize the bin densities */
     for(i=0; i<nbins; ++i)
     {
-        bin_dens_1[i] = bin_dens_1[i]*nbins/(n_samples*sum_ez);
+        bin_dens_1[i] = (bin_dens_1[i]+1)*nbins/(n_samples*(sum_ez+nbins));
         assert( !isnan(bin_dens_1[i]));
-        bin_dens_2[i] = bin_dens_2[i]*nbins/(n_samples*sum_ez_comp);
+        bin_dens_2[i] = (bin_dens_2[i]+1)*nbins/(n_samples*(sum_ez_comp+nbins));
         assert( !isnan(bin_dens_2[i]));
     }
 
@@ -340,24 +344,25 @@ void mstep_gaussian(
         n_samples, x1_cdf, y1_cdf, ez);
 
     double sum_ez = 0;
-    for(int i = 0; i < n_samples; i++)
+    int i;
+    for(i = 0; i < n_samples; i++)
     { 
         sum_ez += ez[i]; 
     }
     *p0 = (sum_ez+1)/((double)n_samples+1);
 }
 
-
-void em_gaussian(
+struct OptimizationRV
+em_gaussian(
     size_t n_samples,
-    float* x, 
-    float* y,
+    double* x, 
+    double* y,
     double* localIDR)
 {
     int i;
     
     double* ez = (double*) malloc( sizeof(double)*n_samples );
-    int mid = round((float) n_samples/2);
+    int mid = round(n_samples/2);
     for(i = 0; i<n_samples/2; i++)
         ez[i] = 0.9;
     for(i = n_samples/2; i<n_samples; i++)
@@ -427,9 +432,9 @@ void em_gaussian(
         
         /* print out the likelihood after each iteration */
         fprintf(stderr, "%i\t%e\n", iter_counter, l);
-        
         if (iter_counter > 1)
         {
+            // assert( likelihood[2] >= likelihood[0] );
             /* Aitken acceleration criterion checking for breaking the loop */
             double a_cri = likelihood[0] + (
                 likelihood[1]-likelihood[0])
@@ -445,10 +450,6 @@ void em_gaussian(
     {
         localIDR[i] = 1.0 - ez[i];
     }
-    fprintf(stderr, "Finished running IDR on the datasets\n");
-    fprintf(stderr, "Final P value = %.15g\n", p0);
-    fprintf(stderr, "Final rho value = %.15g\n", rho);
-    fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
 
     free(ez);
     free(x1_pdf);
@@ -460,4 +461,7 @@ void em_gaussian(
     free(y2_pdf);
     free(y1_cdf);
     free(y2_cdf);
+
+    struct OptimizationRV rv = {iter_counter-1, rho, p0};
+    return rv;
 }

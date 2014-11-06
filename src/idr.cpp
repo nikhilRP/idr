@@ -166,8 +166,8 @@ int
 build_ranks_vector( ProcessPeaks *bc,
                     int rankingMeasure,
                     vector<overlap> &overlaps,
-                    vector<float> &ranks_A,
-                    vector<float> &ranks_B)
+                    vector<double> &ranks_A,
+                    vector<double> &ranks_B)
 {
     vector<double> merge_A, merge_B, unmatched_merge_A, unmatched_merge_B;
     vector<unsigned int> tracker;
@@ -245,7 +245,7 @@ int main(int argc, char* argv[])
     vector<overlap> overlaps;
 
     /* Find the joint peak list, and rank them */
-    vector<float> ranks_A, ranks_B;
+    vector<double> ranks_A, ranks_B;
     build_ranks_vector(
         bc, args.rankingMeasure,
         overlaps,
@@ -254,7 +254,12 @@ int main(int argc, char* argv[])
     vector< pair<int, double> > idr(ranks_A.size());
     fprintf(stderr, "Fit 2-component model - started\n");
     double* localIDR = (double*) malloc(sizeof(double)*ranks_A.size());
-    em_gaussian(ranks_A.size(), ranks_A.data(), ranks_B.data(), localIDR);
+    struct OptimizationRV rv = em_gaussian(ranks_A.size(), ranks_A.data(), ranks_B.data(), localIDR);
+
+    fprintf(stderr, "Finished running IDR on the datasets\n");
+    fprintf(stderr, "Final P value = %.15g\n", rv.p);
+    fprintf(stderr, "Final rho value = %.15g\n", rv.rho);
+    fprintf(stderr, "Total iterations of EM - %d\n", rv.n_iters);
     
     for(int i=0; i<idr.size(); ++i)
     {

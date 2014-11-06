@@ -10,6 +10,7 @@
 #define IDR_H
 
 #include <numeric>
+using namespace std;
 
 #include <cmath>
 #include <float.h>
@@ -17,12 +18,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-using namespace std;
+struct OptimizationRV
+{
+    int n_iters;
+    double rho;
+    double p;
+};
 
-void em_gaussian(
+struct OptimizationRV
+em_gaussian(
     size_t n_samples,
-    float* x, 
-    float* y,
+    double* x, 
+    double* y,
     double* localIDR);
 
 #endif
