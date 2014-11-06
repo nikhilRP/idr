@@ -17,8 +17,8 @@
 
 void em_gaussian(
     size_t n_samples,
-    float* x, 
-    float* y,
+    double* x, 
+    double* y,
     double* localIDR);
 
 #endif

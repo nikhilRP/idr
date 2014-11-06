@@ -274,7 +274,7 @@ build_cumsum(size_t nbins, double* bin_dens, double* bin_cumsum)
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
     size_t n_samples,
-    float* input, 
+    double* input, 
     double* pdf_1, 
     double* pdf_2,
     double* cdf_1, 
@@ -296,7 +296,7 @@ void estimate_marginals(
     
     for(i=0; i<n_samples; ++i)
     {
-        int bin_i = input[i]/((n_samples+1)/nbins);
+        int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);        
     }
@@ -308,16 +308,16 @@ void estimate_marginals(
     /* normalize the bin densities */
     for(i=0; i<nbins; ++i)
     {
-        bin_dens_1[i] = bin_dens_1[i]*nbins/(n_samples*sum_ez);
+        bin_dens_1[i] = (bin_dens_1[i]+1)*nbins/(n_samples*(sum_ez+nbins));
         assert( !isnan(bin_dens_1[i]));
-        bin_dens_2[i] = bin_dens_2[i]*nbins/(n_samples*sum_ez_comp);
+        bin_dens_2[i] = (bin_dens_2[i]+1)*nbins/(n_samples*(sum_ez_comp+nbins));
         assert( !isnan(bin_dens_2[i]));
     }
 
     /* set the pdf variables */
     for(i=0; i<n_samples; ++i)
     {
-        int bin_i = input[i]/((n_samples+1)/nbins);
+        int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
         pdf_1[i] = bin_dens_1[bin_i];
         pdf_2[i] = bin_dens_2[bin_i];
         cdf_1[i] = bin_cumsum_1[bin_i];
@@ -355,14 +355,14 @@ void mstep_gaussian(
 
 void em_gaussian(
     size_t n_samples,
-    float* x, 
-    float* y,
+    double* x, 
+    double* y,
     double* localIDR)
 {
     int i;
     
     double* ez = (double*) malloc( sizeof(double)*n_samples );
-    int mid = round((float) n_samples/2);
+    int mid = round(n_samples/2);
     for(i = 0; i<n_samples/2; i++)
         ez[i] = 0.9;
     for(i = n_samples/2; i<n_samples; i++)
