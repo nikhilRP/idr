@@ -449,12 +449,15 @@ void em_gaussian(
     fprintf(stderr, "Final P value = %.15g\n", p0);
     fprintf(stderr, "Final rho value = %.15g\n", rho);
     fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
-    
+
+    free(ez);
     free(x1_pdf);
     free(x2_pdf);
     free(x1_cdf);
+    free(x2_cdf);
+
     free(y1_pdf);
     free(y2_pdf);
     free(y1_cdf);
-
+    free(y2_cdf);
 }
