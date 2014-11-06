@@ -11,28 +11,19 @@ set(MYLIB_NAME "IDR")
 set(MYLIB_VERSION "0.1.0.${BUILD_NUMBER}")
 set(MYLIB_BRIEF "${MYLIB_NAME} is a C++ implementation of Irreproducible Discovery Rate")
 
-# Not using this for now
-#option(MYLIB_TESTS_ENABLED "Enable tests build" ON)
+# default to release builds
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
 
-# code coverage options
-set(GCOV_FLAGS "-fprofile-arcs -ftest-coverage")
-
-set(DEBUG_FLAGS "-g -O0 -Wall")
 set(RELEASE_FLAGS "-O4 -DNDEBUG")
+set(DEBUG_FLAGS "-g -O0 -Wall")
 
 set(CMAKE_CXX_FLAGS ${RELEASE_FLAGS})
 set(CMAKE_C_FLAGS ${RELEASE_FLAGS})
 
 set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_FLAGS})
-set(CMAKE_CXX_FLAGS_DEBUG ${GCOV_FLAGS})
 set(CMAKE_C_FLAGS_DEBUG ${DEBUG_FLAGS})
-set(CMAKE_C_FLAGS_DEBUG ${GCOV_FLAGS})
-set(CMAKE_EXE_LINKER_FLAGS_DEBUG ${GCOV_FLAGS})
-
-# TODO OP check how this works on multiple configurations generators
-# available configurations in multiple configurations enabled generators
-set(CMAKE_CONFIGURATION_TYPES Debug Release)
-#message("CMAKE_CFG_INTDIR = ${CMAKE_CFG_INTDIR}")
 
 add_subdirectory(src)
 
