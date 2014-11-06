@@ -90,7 +90,6 @@ class Args {
         bool haveBedA = false;
         bool haveBedB = false;
         bool haveGenome = false;
-        bool haveOutput = false;
 
         if(argc <= 1) ShowHelp();
 
@@ -120,7 +119,6 @@ class Args {
             }
             else if(PARAMETER_CHECK("-o", 2, parameterLength)) {
                 if((i+1) < argc) {
-                    haveOutput = true;
                     this->ofname = argv[i + 1];
                     i++;
                 }
@@ -251,6 +249,23 @@ int main(int argc, char* argv[])
         overlaps,
         ranks_A, ranks_B );
 
+    #ifndef NDEBUG
+    // Make sure that the max rank is equal to the number of samples
+    double max_rankA = 0;
+    double max_rankB = 0;
+    
+    assert(ranks_A.size() == ranks_B.size());
+    for(size_t i=0; i < ranks_A.size(); i++)
+    {
+        if( ranks_A[i] > max_rankA )
+            max_rankA = ranks_A[i];
+        if( ranks_B[i] > max_rankB )
+            max_rankB = ranks_B[i];
+    }
+    assert(abs(max_rankA - (double)ranks_A.size()) < 2);
+    assert(abs(max_rankB - (double)ranks_B.size()) < 2);
+    #endif
+    
     vector< pair<int, double> > idr(ranks_A.size());
     fprintf(stderr, "Fit 2-component model - started\n");
     double* localIDR = (double*) malloc(sizeof(double)*ranks_A.size());
@@ -261,19 +276,19 @@ int main(int argc, char* argv[])
     fprintf(stderr, "Final rho value = %.15g\n", rv.rho);
     fprintf(stderr, "Total iterations of EM - %d\n", rv.n_iters);
     
-    for(int i=0; i<idr.size(); ++i)
+    for(size_t i=0; i<idr.size(); ++i)
     {
         idr[i].first = i+1;
         idr[i].second = localIDR[i];
     }
 
     sort(idr.begin(), idr.end(), sort_pred());
-    for(int i=1; i<idr.size(); ++i)
+    for(size_t i=1; i<idr.size(); ++i)
     {
         idr[i].second = idr[i].second + idr[i-1].second;
     }
     int num_peaks_passing_threshold = 0;
-    for(int j=0; j<ranks_A.size(); ++j)
+    for(size_t j=0; j<ranks_A.size(); ++j)
     {
         idr[j].second = idr[j].second/((double)j);
         if(idr[j].second <= args.idrCutoff) {
@@ -281,7 +296,7 @@ int main(int argc, char* argv[])
         }
     };
     sort(idr.begin(), idr.end());
-    for (unsigned int i=0; i<idr.size(); ++i)
+    for (size_t i=0; i<idr.size(); ++i)
     {
         overlaps[i].idrLocal = localIDR[i];
         overlaps[i].idr = idr[i].second;
@@ -290,7 +305,7 @@ int main(int argc, char* argv[])
     fb.open(args.ofname.c_str(), std::ios::out);
     std::ostream fout(&fb);
     fout.precision(15);
-    for (unsigned int i=0; i < idr.size(); ++i)
+    for (size_t i=0; i < idr.size(); ++i)
     {
         if (overlaps[i].idr <= args.idrCutoff)
         {

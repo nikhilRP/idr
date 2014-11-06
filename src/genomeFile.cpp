@@ -48,9 +48,10 @@ void GenomeFile::loadGenomeFileIntoMap() {
                 // we need at least 2 columns
                 if (genomeFields.size() >= 2) {
                     char *p2End;
-                    long c2;
                     // make sure the second column is numeric.
-                    c2 = strtol(genomeFields[1].c_str(), &p2End, 10);
+                    // XXX this isnt currently being used - commented out to avoid compile warnings
+                    // long c2 = 
+                    strtol(genomeFields[1].c_str(), &p2End, 10);
 
                     // strtol  will set p2End to the start of the string if non-integral, base 10
                     if (p2End != genomeFields[1].c_str()) {

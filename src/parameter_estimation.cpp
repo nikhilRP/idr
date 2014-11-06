@@ -25,7 +25,7 @@ double NormalCDFInverse(double p)
 
 void calculate_quantiles(
     double rho,
-    size_t n_samples,
+    int n_samples,
     double* x_cdf, 
     double* y_cdf,
     double* updated_density
@@ -44,7 +44,7 @@ void calculate_quantiles(
 
 double cost_function(
     double rho,
-    size_t n_samples,
+    int n_samples,
     double* x_cdf, 
     double* y_cdf,
     double* ez )
@@ -68,7 +68,7 @@ double cost_function(
 }
 
 double maximum_likelihood(
-    size_t n_samples,
+    int n_samples,
     double* x_cdf,
     double* y_cdf,
     double* ez)
@@ -177,7 +177,7 @@ double maximum_likelihood(
 }
 
 double gaussian_loglikelihood(
-    size_t n_samples,
+    int n_samples,
     
     double*  x1_pdf, 
     double*  x2_pdf,
@@ -204,7 +204,7 @@ double gaussian_loglikelihood(
 }
 
 void estep_gaussian(
-    size_t n_samples,
+    int n_samples,
     double* x1_pdf, double* x2_pdf,
     double* x1_cdf, double* x2_cdf, 
     double* y1_pdf, double* y2_pdf,
@@ -246,7 +246,7 @@ void estep_gaussian(
 /* build the properly normalized cumsum array for bin_dens,
    store it into bin_cumsum, and return the sum */
 double
-build_cumsum(size_t nbins, double* bin_dens, double* bin_cumsum)
+build_cumsum(int nbins, double* bin_dens, double* bin_cumsum)
 {
     /* normalize the bin counts */
     double cumsum = 0;
@@ -273,7 +273,7 @@ build_cumsum(size_t nbins, double* bin_dens, double* bin_cumsum)
 
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
-    size_t n_samples,
+    int n_samples,
     double* input, 
     double* pdf_1, 
     double* pdf_2,
@@ -283,7 +283,7 @@ void estimate_marginals(
     /* the estimated mixture paramater for each point */
     double* ez, 
     
-    size_t nbins)
+    int nbins)
 {
     /* counter we will use throughout the script */
     int i;
@@ -335,7 +335,7 @@ void estimate_marginals(
 
 void mstep_gaussian(
     double* p0, double* rho,
-    size_t n_samples,
+    int n_samples,
     double* x1_cdf, 
     double* y1_cdf,
     double* ez)
@@ -354,7 +354,7 @@ void mstep_gaussian(
 
 struct OptimizationRV
 em_gaussian(
-    size_t n_samples,
+    int n_samples,
     double* x, 
     double* y,
     double* localIDR)
@@ -362,7 +362,6 @@ em_gaussian(
     int i;
     
     double* ez = (double*) malloc( sizeof(double)*n_samples );
-    int mid = round(n_samples/2);
     for(i = 0; i<n_samples/2; i++)
         ez[i] = 0.9;
     for(i = n_samples/2; i<n_samples; i++)
@@ -374,7 +373,7 @@ em_gaussian(
     double eps = 0.01;
 
     /* Initialize the set of break points for the histogram averaging */
-    size_t n_bins = 50;
+    int n_bins = 50;
     
     /*
      * CDF and PDF vectors for the input vectors.

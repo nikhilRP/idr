@@ -27,7 +27,7 @@ struct OptimizationRV
 
 struct OptimizationRV
 em_gaussian(
-    size_t n_samples,
+    int n_samples,
     double* x, 
     double* y,
     double* localIDR);

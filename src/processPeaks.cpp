@@ -189,7 +189,7 @@ unsigned int get_intersections(struct interval *A,
             B,
             size_B,
             *R);
-    int i;
+    unsigned int i;
     for (i = 1; i < size_A; i++)
         (*R)[i] = (*R)[i] + (*R)[i-1];
 
@@ -246,10 +246,10 @@ void ProcessPeaks::FindOverlaps() {
     parse_files(_genome, &_offsets, _peakA, _peakB, &A, &B);
     fprintf(stderr, "Processing peaks - Done\n");
 
-    uint32_t tot_overlaps = get_intersections(&A[0],
-            A.size(),
-            &B[0],
-            B.size(),
-            &overlap_index_A,
-            &overlap_index_B);
+    get_intersections(&A[0],
+                      A.size(),
+                      &B[0],
+                      B.size(),
+                      &overlap_index_A,
+                      &overlap_index_B);
 }
