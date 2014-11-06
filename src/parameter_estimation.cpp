@@ -304,9 +304,9 @@ void estimate_marginals(
     /* normalize the bin densities */
     for(i=0; i<nbins; ++i)
     {
-        bin_dens_1[i] = bin_dens_1[i]*nbins/(n_samples*sum_ez);
+        bin_dens_1[i] = (bin_dens_1[i]+1)*nbins/(n_samples*sum_ez);
         assert( !isnan(bin_dens_1[i]));
-        bin_dens_2[i] = bin_dens_2[i]*nbins/(n_samples*sum_ez_comp);
+        bin_dens_2[i] = (bin_dens_2[i]+1)*nbins/(n_samples*sum_ez_comp);
         assert( !isnan(bin_dens_2[i]));
     }
 
