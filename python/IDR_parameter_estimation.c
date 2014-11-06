@@ -352,8 +352,8 @@ void mstep_gaussian(
     *p0 = (sum_ez+1)/((double)n_samples+1);
 }
 
-
-void em_gaussian(
+struct OptimizationRV
+em_gaussian(
     size_t n_samples,
     double* x, 
     double* y,
@@ -450,11 +450,7 @@ void em_gaussian(
     {
         localIDR[i] = 1.0 - ez[i];
     }
-    fprintf(stderr, "Finished running IDR on the datasets\n");
-    fprintf(stderr, "Final P value = %.15g\n", p0);
-    fprintf(stderr, "Final rho value = %.15g\n", rho);
-    fprintf(stderr, "Total iterations of EM - %d\n", iter_counter-1);
-
+    
     free(ez);
     free(x1_pdf);
     free(x2_pdf);
@@ -465,4 +461,7 @@ void em_gaussian(
     free(y2_pdf);
     free(y1_cdf);
     free(y2_cdf);
+
+    struct OptimizationRV rv = {iter_counter-1, rho, p0};
+    return rv;
 }

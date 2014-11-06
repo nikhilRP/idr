@@ -15,7 +15,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-void em_gaussian(
+struct OptimizationRV
+{
+    int n_iters;
+    double rho;
+    double p;
+};
+
+struct OptimizationRV
+em_gaussian(
     size_t n_samples,
     double* x, 
     double* y,
