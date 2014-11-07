@@ -118,9 +118,9 @@ def build_rank_vectors(merged_peaks):
     # build hte ranks - we add uniform random noise to break ties
     # len(merged_peaks) - 
     r1 = numpy.random.random(len(merged_peaks))
-    s1 = numpy.array(numpy.lexsort((-r1, -s1)), dtype='d')
+    s1 = numpy.array(numpy.lexsort((-r1, -s1)), dtype=float)
     r2 = numpy.random.random(len(merged_peaks))
-    s2 = numpy.array(numpy.lexsort((-r2, -s2)), dtype='d')
+    s2 = numpy.array(numpy.lexsort((-r2, -s2)), dtype=float)
     return s1, s2
 
 def build_idr_output_line(contig, strand, signals, merged_peak, localIDR, globalIDR):
