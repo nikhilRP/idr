@@ -357,7 +357,8 @@ em_gaussian(
     int n_samples,
     double* x, 
     double* y,
-    double* localIDR)
+    double* localIDR,
+    int print_status_msgs )
 {
     int i;
     
@@ -430,7 +431,9 @@ em_gaussian(
         likelihood[2] = l;
         
         /* print out the likelihood after each iteration */
-        fprintf(stderr, "%i\t%e\n", iter_counter, l);
+        if(print_status_msgs) {
+            fprintf(stderr, "%i\t%e\n", iter_counter, l);
+        }
         
         if (iter_counter > 1)
         {

@@ -11,6 +11,7 @@ C_em_gaussian.restype = c_OptimizationRV
 import numpy
 
 def mean(items):
+    items = list(items)
     return sum(items)/float(len(items))
 
 from collections import namedtuple, defaultdict, OrderedDict
@@ -18,20 +19,25 @@ from itertools import chain
 Peak = namedtuple('Peak', ['chrm', 'strand', 'start', 'stop', 'signal'])
 
 VERBOSE = False
+QUIET = False
+
+IGNORE_NONOVERLAPPING_PEAKS = False
 
 def em_gaussian(ranks_1, ranks_2):
     n = len(ranks_1)
     assert( n == len(ranks_1) == len(ranks_2) )
     localIDR = numpy.zeros(n, dtype='d')
     rv = C_em_gaussian(
-        ctypes.c_size_t(n), 
+        ctypes.c_int(n), 
         ranks_1.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
         ranks_2.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        localIDR.ctypes.data_as(ctypes.POINTER(ctypes.c_double))  )
+        localIDR.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+        (ctypes.c_int(1) if VERBOSE else ctypes.c_int(0)) )
     n_iters, rho, p = rv.n_iters, rv.rho, rv.p
     return (n_iters, rho, p), localIDR
 
-def load_bed(fp):
+def load_bed(fp, signal_type):
+    signal_index = {"signal.value": 6, "p.value": 7, "q.value": 8}[signal_type]
     grpd_peaks = defaultdict(list)
     for line in fp:
         if line.startswith("#"): continue
@@ -41,7 +47,7 @@ def load_bed(fp):
         grpd_peaks[(peak.chrm, peak.strand)].append(peak)
     return grpd_peaks
 
-def merge_peaks_in_contig(s1_peaks, s2_peaks):
+def merge_peaks_in_contig(s1_peaks, s2_peaks, pk_agg_fn):
     """Merge peaks in a single contig/strand.
     
     returns: The merged peaks. 
@@ -77,16 +83,17 @@ def merge_peaks_in_contig(s1_peaks, s2_peaks):
             grpd_peaks[x[3]].append(x)
 
         # skip regions that dont have a peak in all replicates
-        if any(0 == len(peaks) for peaks in grpd_peaks.values()):
-            continue
+        if IGNORE_NONOVERLAPPING_PEAKS:
+            if any(0 == len(peaks) for peaks in grpd_peaks.values()):
+                continue
 
-        s1, s2 = (sum(pk[2] for pk in pks) for pks in grpd_peaks.values())
+        s1, s2 = (pk_agg_fn(pk[2] for pk in pks) for pks in grpd_peaks.values())
         merged_pk = (pk_start, pk_stop, s1, s2, grpd_peaks)
         merged_pks.append(merged_pk)
     
     return merged_pks
 
-def merge_peaks(s1_peaks, s2_peaks):
+def merge_peaks(s1_peaks, s2_peaks, pk_agg_fn):
     """Merge peaks over all contig/strands
     
     """
@@ -96,7 +103,8 @@ def merge_peaks(s1_peaks, s2_peaks):
         # since s*_peaks are default dicts, it will never raise a key error, 
         # but instead return an empty list which is what we want
         merged_peaks.extend(
-            key + pk for pk in merge_peaks_in_contig(s1_peaks[key], s2_peaks[key]))
+            key + pk for pk in merge_peaks_in_contig(
+                s1_peaks[key], s2_peaks[key], pk_agg_fn))
     return merged_peaks
 
 def build_rank_vectors(merged_peaks):
@@ -106,16 +114,23 @@ def build_rank_vectors(merged_peaks):
     # add the signal
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
+    
     # build hte ranks - we add uniform random noise to break ties
-    s1 = numpy.array((s1.argsort() + numpy.random.random(len(merged_peaks))).argsort(), dtype='d')
-    s2 = numpy.array((s2.argsort() + numpy.random.random(len(merged_peaks))).argsort(), dtype='d')
+    # len(merged_peaks) - 
+    r1 = numpy.random.random(len(merged_peaks))
+    s1 = numpy.array(numpy.lexsort((-r1, -s1)), dtype='d')
+    r2 = numpy.random.random(len(merged_peaks))
+    s2 = numpy.array(numpy.lexsort((-r2, -s2)), dtype='d')
     return s1, s2
 
 def build_idr_output_line(contig, strand, signals, merged_peak, localIDR, globalIDR):
     rv = [contig,]
     for signal, key in zip(signals, (1,2)):
-        rv.append( "%i" % min(x[0] for x in merged_peak[key]))
-        rv.append( "%i" % max(x[1] for x in merged_peak[key]))
+        if len(merged_peak[key]) == 0: 
+            rv.extend(("-1", "-1"))
+        else:
+            rv.append( "%i" % min(x[0] for x in merged_peak[key]))
+            rv.append( "%i" % max(x[1] for x in merged_peak[key]))
         rv.append( "%.5f" % signal )
     
     rv.append("%.5f" % globalIDR)
@@ -152,45 +167,91 @@ Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>, Nathan Boley <npboley@gmail
     parser.add_argument( '--rank', default="signal.value",
                          choices=["signal.value", "p.value", "q.value"],
                          help='Type of ranking measure to use.')
+    
+    parser.add_argument( '--use-nonoverlapping-peaks', action="store_true", default=False,
+        help='Use peaks without an overlapping match, setting the value to 0 for signal and 1 for p/qvalue.')
+    
+    parser.add_argument( '--peak-merge-method', 
+                         choices=["sum", "avg", "min", "max"], default=None,
+        help="Which method to use for merging peaks. Default: 'mean' for signal, 'min' for p/q-value.")
+    
+    parser.add_argument( '--verbose', action="store_true", default=False, help="Print out additional debug information")
+    parser.add_argument( '--quiet', action="store_true", default=False, help="Don't print any status messages")
 
     args = parser.parse_args()
-    return args
+
+    global VERBOSE
+    if args.verbose: VERBOSE = True 
+
+    global QUIET
+    if args.quiet: QUIET = True 
+
+    global IGNORE_NONOVERLAPPING_PEAKS
+    IGNORE_NONOVERLAPPING_PEAKS = not args.use_nonoverlapping_peaks
+
+    # decide what aggregation function to use for peaks that need to be merged
+    if args.peak_merge_method == None:
+        peak_merge_fn = {"signal.value": mean, "q.value": min, "p.value": min}[
+            args.rank]
+    else:
+        peak_merge_fn = {"sum": sum, "avg": mean, "min": min, "max": max}[
+            args.peak_merge_method]
+
+    return args, peak_merge_fn
+
+def log(msg, level=None):
+    if QUIET: return
+    if level == None or (level == 'VERBOSE' and VERBOSE):
+        print(msg, file=sys.stderr)
 
 def main():
-    args = parse_args()
+    args, peak_merge_fn = parse_args()
     
     # load the peak files
-    f1 = load_bed(args.a)
-    f2 = load_bed(args.b)
+    log("Loading the peak files", 'VERBOSE');
+    f1 = load_bed(args.a, args.rank)
+    f2 = load_bed(args.b, args.rank)
 
     # build a unified peak set
-    merged_peaks = merge_peaks(f1, f2)
+    log("Merging peaks", 'VERBOSE');
+    merged_peaks = merge_peaks(f1, f2, peak_merge_fn)
     
     # build the ranks vector
+    log("Ranking peaks", 'VERBOSE');
     s1, s2 = build_rank_vectors(merged_peaks)
 
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)
+    log("Fitting the model parameters", 'VERBOSE');
     (n_iter, rho, p), localIDRs = em_gaussian(s1, s2)
     
-    print("Finished running IDR on the datasets");
-    print("Final P value = %.15f" % p);
-    print("Final rho value = %.15f" % rho);
-    print("Total iterations of EM - %i" % n_iter);
+    log("Finished running IDR on the datasets");
+    log("Final P value = %.15f" % p);
+    log("Final rho value = %.15f" % rho);
+    log("Total iterations of EM - %i" % n_iter);
     
     # build the global IDR array
+    log("Building the global IDR array", 'VERBOSE');
     merged_data = sorted(zip(localIDRs, merged_peaks))
     globalIDRs = [merged_data[0][0],]
     for i, (localIDR, merged_peak) in enumerate(merged_data[1:]):
         globalIDRs.append( (localIDR + globalIDRs[i])/(i+1) )
 
     # write out the ouput
+    log("Writing results to file", "VERBOSE");
+    num_peaks_passing_thresh = 0
     for globalIDR, (localIDR, merged_peak) in zip(globalIDRs, merged_data):
         # skip peaks with global idr values below the threshold
         if globalIDR > args.idr: continue
-        opline = build_idr_output_line(merged_peak[0], merged_peak[1], merged_peak[4:6], merged_peak[6], localIDR, globalIDR)
+        num_peaks_passing_thresh += 1
+        opline = build_idr_output_line(
+            merged_peak[0], merged_peak[1], 
+            merged_peak[4:6], 
+            merged_peak[6], localIDR, globalIDR)
         print( opline, file=args.output_file )
-    
+
+    log("Number of peaks passing IDR cutoff of {} - {}\n".format(
+            args.idr, num_peaks_passing_thresh))
     args.output_file.close()
 
 if __name__ == '__main__':

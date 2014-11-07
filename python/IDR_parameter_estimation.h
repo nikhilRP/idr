@@ -27,6 +27,7 @@ em_gaussian(
     int n_samples,
     double* x, 
     double* y,
-    double* localIDR);
+    double* localIDR,
+    int print_status_msgs);
 
 #endif
