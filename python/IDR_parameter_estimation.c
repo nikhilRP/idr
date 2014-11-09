@@ -371,7 +371,7 @@ em_gaussian(
     /* initialize the default configuration options */
     double p0 = 0.5;
     double rho = 0.0;
-    double eps = 0.01;
+    double eps = 1e-2;
 
     /* Initialize the set of break points for the histogram averaging */
     int n_bins = 50;
@@ -432,7 +432,7 @@ em_gaussian(
         
         /* print out the likelihood after each iteration */
         if(print_status_msgs) {
-            fprintf(stderr, "%i\t%e\n", iter_counter, l);
+            fprintf(stderr, "%i\t%e\t%e\t%e\n", iter_counter, p0, rho, l);
         }
         
         if (iter_counter > 1)

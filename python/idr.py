@@ -114,14 +114,26 @@ def build_rank_vectors(merged_peaks):
     # add the signal
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
-    
+
+    """
     # build hte ranks - we add uniform random noise to break ties
     # len(merged_peaks) - 
     r1 = numpy.random.random(len(merged_peaks))
-    s1 = numpy.array(numpy.lexsort((-r1, -s1)), dtype=float)
+    #s1 = numpy.array(numpy.lexsort((r1, s1)), dtype=float)
+    s1 = numpy.array((s1+r1).argsort(), dtype='d')
+
     r2 = numpy.random.random(len(merged_peaks))
-    s2 = numpy.array(numpy.lexsort((-r2, -s2)), dtype=float)
-    return s1, s2
+    #s2 = numpy.array(numpy.lexsort((r2, s2)), dtype=float)
+    s2 = numpy.array((s2+r2).argsort(), dtype='d')
+    """
+    
+    #s1 = numpy.array((s1.argsort() + numpy.random.random(len(merged_peaks))).argsort(), dtype='d')
+    #s2 = numpy.array((s2.argsort() + numpy.random.random(len(merged_peaks))).argsort(), dtype='d')
+
+    rv1 = numpy.array(s1.argsort().argsort(), dtype='d')
+    rv2 = numpy.array(s2.argsort().argsort(), dtype='d')
+    
+    return rv1, rv2
 
 def build_idr_output_line(contig, strand, signals, merged_peak, localIDR, globalIDR):
     rv = [contig,]
