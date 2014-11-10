@@ -233,11 +233,12 @@ void estep_gaussian(
         density_c2[i] is always 1.0
         */
         double numerator = p * density_c1[i] * x1_pdf[i] * y1_pdf[i];
+        printf("%e\t%e\t%e\t%e\n", density_c1[i], x1_cdf[i], y1_cdf[i]);
         double denominator = numerator + (1-p) * 1.0 * x2_pdf[i] * y2_pdf[i];
         ez[i] = numerator/denominator;
         assert( !isnan(ez[i]) );
     }
-
+    exit(0);
     free(density_c1);
     // we don't use this - see above
     // free(density_c2);
@@ -363,9 +364,9 @@ em_gaussian(
     
     double* ez = (double*) malloc( sizeof(double)*n_samples );
     for(i = 0; i<n_samples/2; i++)
-        ez[i] = 0.9;
+        ez[i] = 0.5;
     for(i = n_samples/2; i<n_samples; i++)
-        ez[i] = 0.1;
+        ez[i] = 0.5;
 
     /* initialize the default configuration options */
     double p0 = 0.5;
@@ -430,9 +431,10 @@ em_gaussian(
         likelihood[2] = l;
         
         /* print out the likelihood after each iteration */
-        fprintf(stderr, "%i\t%e\n", iter_counter, l);
-        if (iter_counter > 1)
+        fprintf(stderr, "%i\t%e\t%e\t%e\n", iter_counter, p0, rho, l);
+        if (iter_counter > 20)
         {
+            break;
             // assert( likelihood[2] >= likelihood[0] );
             /* Aitken acceleration criterion checking for breaking the loop */
             double a_cri = likelihood[0] + (

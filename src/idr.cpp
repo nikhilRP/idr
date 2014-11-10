@@ -262,8 +262,8 @@ int main(int argc, char* argv[])
         if( ranks_B[i] > max_rankB )
             max_rankB = ranks_B[i];
     }
-    assert(abs(max_rankA - (double)ranks_A.size()) < 2);
-    assert(abs(max_rankB - (double)ranks_B.size()) < 2);
+    //assert(abs(max_rankA - (double)ranks_A.size()) < 2);
+    //assert(abs(max_rankB - (double)ranks_B.size()) < 2);
     #endif
     
     vector< pair<int, double> > idr(ranks_A.size());

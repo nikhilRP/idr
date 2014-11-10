@@ -37,8 +37,10 @@ void calculate_quantiles(
         double a = pow(NormalCDFInverse(x_cdf[i]), 2) 
                    + pow(NormalCDFInverse(y_cdf[i]), 2);
         double b = NormalCDFInverse(x_cdf[i]) * NormalCDFInverse(y_cdf[i]);
-        updated_density[i] = exp( -log(1 - pow(rho, 2)) / 2 
-                                  - rho/(2 * (1 - pow(rho, 2))) * (rho*a-2*b));
+        updated_density[i] = exp( 
+            -log(1 - pow(rho, 2)) / 2 
+            - rho/(2 * (1 - pow(rho, 2))) * (rho*a-2*b)
+            );
     }
 }
 
@@ -233,11 +235,12 @@ void estep_gaussian(
         density_c2[i] is always 1.0
         */
         double numerator = p * density_c1[i] * x1_pdf[i] * y1_pdf[i];
+        printf("%e\t%e\t%e\t%e\n", density_c1[i], x1_cdf[i], y1_cdf[i], density_c1[i]);
         double denominator = numerator + (1-p) * 1.0 * x2_pdf[i] * y2_pdf[i];
         ez[i] = numerator/denominator;
         assert( !isnan(ez[i]) );
     }
-
+    exit(0);
     free(density_c1);
     // we don't use this - see above
     // free(density_c2);
@@ -300,7 +303,7 @@ void estimate_marginals(
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);        
     }
-
+    
     /* build the cumsum arrays, and return the total sum for each component */
     double sum_ez = build_cumsum(nbins, bin_dens_1, bin_cumsum_1);
     double sum_ez_comp = build_cumsum(nbins, bin_dens_2, bin_cumsum_2);
@@ -363,14 +366,18 @@ em_gaussian(
     int i;
     
     double* ez = (double*) malloc( sizeof(double)*n_samples );
-    for(i = 0; i<n_samples/2; i++)
-        ez[i] = 0.9;
-    for(i = n_samples/2; i<n_samples; i++)
-        ez[i] = 0.1;
+    for(i = 0; i<n_samples; i++)
+    {
+        if(x[i] < n_samples/2) {
+            ez[i] = 0.5;
+        } else {
+            ez[i] = 0.5;
+        }
+    }
 
     /* initialize the default configuration options */
-    double p0 = 0.5;
-    double rho = 0.0;
+    double p0 = -1;
+    double rho = -1;
     double eps = 1e-2;
 
     /* Initialize the set of break points for the histogram averaging */
@@ -392,7 +399,9 @@ em_gaussian(
     
     /* Likelihood vector */
     double likelihood[3] = {0,0,0};
-
+    double prev_p = -1;
+    double prev_rho = -1;
+    
     int iter_counter;
     for(iter_counter=0;;iter_counter++)
     {
@@ -407,10 +416,11 @@ em_gaussian(
                            y1_cdf, y2_cdf,
                            ez,
                            n_bins );
-
+        
         mstep_gaussian(&p0, &rho, n_samples, 
                        x1_cdf, y1_cdf, ez);
-        
+        if( p0 > 0.35)p0 = 0.35;
+
         estep_gaussian(n_samples,
                        x1_pdf, x2_pdf, 
                        x1_cdf, x2_cdf,
@@ -418,7 +428,7 @@ em_gaussian(
                        y1_cdf, y2_cdf,
                        ez, 
                        p0, rho);
-
+        
         double l = gaussian_loglikelihood(
             n_samples,
             x1_pdf, x2_pdf, x1_cdf, 
@@ -435,16 +445,21 @@ em_gaussian(
             fprintf(stderr, "%i\t%e\t%e\t%e\n", iter_counter, p0, rho, l);
         }
         
-        if (iter_counter > 1)
+        if (iter_counter > 3)
         {
             /* Aitken acceleration criterion checking for breaking the loop */
             double a_cri = likelihood[0] + (
                 likelihood[1]-likelihood[0])
                 / (1-(likelihood[2]-likelihood[1])/(
                        likelihood[1]-likelihood[0]));
-            if ( abs(a_cri-likelihood[2]) <= eps )
+            if ( fabs(a_cri-likelihood[2]) <= eps
+                 && fabs(p0 - prev_p) <= eps
+                 && fabs(rho - prev_rho) <= eps)
             { break; }
         }
+        
+        prev_rho = rho;
+        prev_p = p0;
 
     }
     

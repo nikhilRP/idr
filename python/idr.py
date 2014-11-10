@@ -105,6 +105,8 @@ def merge_peaks(s1_peaks, s2_peaks, pk_agg_fn):
         merged_peaks.extend(
             key + pk for pk in merge_peaks_in_contig(
                 s1_peaks[key], s2_peaks[key], pk_agg_fn))
+    
+    merged_peaks.sort(key=lambda x:pk_agg_fn((x[4],x[5])))
     return merged_peaks
 
 def build_rank_vectors(merged_peaks):
@@ -127,11 +129,8 @@ def build_rank_vectors(merged_peaks):
     s2 = numpy.array((s2+r2).argsort(), dtype='d')
     """
     
-    #s1 = numpy.array((s1.argsort() + numpy.random.random(len(merged_peaks))).argsort(), dtype='d')
-    #s2 = numpy.array((s2.argsort() + numpy.random.random(len(merged_peaks))).argsort(), dtype='d')
-
-    rv1 = numpy.array(s1.argsort().argsort(), dtype='d')
-    rv2 = numpy.array(s2.argsort().argsort(), dtype='d')
+    rv1 = numpy.array(s1.argsort(), dtype='d')
+    rv2 = numpy.array(s2.argsort(), dtype='d')
     
     return rv1, rv2
 
@@ -231,7 +230,11 @@ def main():
     # build the ranks vector
     log("Ranking peaks", 'VERBOSE');
     s1, s2 = build_rank_vectors(merged_peaks)
-
+    merged_peaks = list(zip( s1, s2, merged_peaks ))
+    merged_peaks.sort(key=lambda x: x[0] + x[1])
+    s1 = numpy.array([x[0] for x in merged_peaks], dtype='d')
+    s2 = numpy.array([x[1] for x in merged_peaks], dtype='d')
+    
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)
     log("Fitting the model parameters", 'VERBOSE');
@@ -244,15 +247,15 @@ def main():
     
     # build the global IDR array
     log("Building the global IDR array", 'VERBOSE');
-    merged_data = sorted(zip(localIDRs, merged_peaks))
+    merged_data = sorted(zip(localIDRs, merged_peaks), reverse=True)
     globalIDRs = [merged_data[0][0],]
     for i, (localIDR, merged_peak) in enumerate(merged_data[1:]):
-        globalIDRs.append( (localIDR + globalIDRs[i])/(i+1) )
+        globalIDRs.append( (localIDR + globalIDRs[i])/(i+2) )
 
     # write out the ouput
     log("Writing results to file", "VERBOSE");
     num_peaks_passing_thresh = 0
-    for globalIDR, (localIDR, merged_peak) in zip(globalIDRs, merged_data):
+    for globalIDR, (localIDR, (r1, r2, merged_peak)) in zip(globalIDRs, merged_data):
         # skip peaks with global idr values below the threshold
         if globalIDR > args.idr: continue
         num_peaks_passing_thresh += 1
