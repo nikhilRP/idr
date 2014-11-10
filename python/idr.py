@@ -3,9 +3,12 @@ import os, sys
 import ctypes
 
 class c_OptimizationRV(ctypes.Structure):
-    _fields_ = [("n_iters", ctypes.c_int), ("rho", ctypes.c_double), ("p", ctypes.c_double)]
+    _fields_ = [("n_iters", ctypes.c_int), 
+                ("rho", ctypes.c_double), 
+                ("p", ctypes.c_double)]
                 
-C_em_gaussian = ctypes.cdll.LoadLibrary("./IDR_parameter_estimation.so").em_gaussian
+C_em_gaussian = ctypes.cdll.LoadLibrary(
+    "./IDR_parameter_estimation.so").em_gaussian
 C_em_gaussian.restype = c_OptimizationRV
 
 import numpy
@@ -43,7 +46,10 @@ def load_bed(fp, signal_type):
         if line.startswith("#"): continue
         if line.startswith("track"): continue
         data = line.split()
-        peak = Peak(data[0], data[5], int(data[1]), int(data[2]), float(data[6]))
+        signal = float(data[signal_index])
+        if signal < 0: 
+            raise ValueError("Invalid {}: {:e}".format(signal_type, signal))
+        peak = Peak(data[0], data[5], int(data[1]), int(data[2]), signal )
         grpd_peaks[(peak.chrm, peak.strand)].append(peak)
     return grpd_peaks
 
@@ -52,10 +58,10 @@ def merge_peaks_in_contig(s1_peaks, s2_peaks, pk_agg_fn):
     
     returns: The merged peaks. 
     """
-    # merge and sort all peaks, keeping track of which sample they originated inx
+    # merge and sort all peaks, keeping track of which sample they originated in
     all_intervals = sorted(chain(
-            ((pk.start, pk.stop, pk.signal, 1) for i, pk in enumerate(s1_peaks)),
-            ((pk.start, pk.stop, pk.signal, 2) for i, pk in enumerate(s2_peaks))))
+            ((pk.start,pk.stop,pk.signal,1) for i, pk in enumerate(s1_peaks)),
+            ((pk.start,pk.stop,pk.signal,2) for i, pk in enumerate(s2_peaks))))
     
     # grp overlapping intervals. Since they're already sorted, all we need
     # to do is check if the current interval overlaps the previous interval
@@ -117,10 +123,10 @@ def build_rank_vectors(merged_peaks):
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
     
-    rv1 = numpy.array(len(s1) - s1.argsort(), dtype='d')
-    rv2 = numpy.array(len(s2) - s2.argsort(), dtype='d')
+    rank1 = numpy.lexsort((numpy.random.random(len(s1)), -s1))
+    rank2 = numpy.lexsort((numpy.random.random(len(s2)), -s2))
     
-    return rv1, rv2
+    return numpy.array(rank1, dtype='d'), numpy.array(rank2, dtype='d')
 
 def build_idr_output_line(
     contig, strand, signals, merged_peak, 
@@ -150,7 +156,8 @@ def parse_args():
         description="""
 Program: IDR (Irreproducible Discovery Rate)
 Version: {PACKAGE_VERSION}\n
-Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>, Nathan Boley <npboley@gmail.com>
+Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>
+         Nathan Boley <npboley@gmail.com>
 
 """)
 
@@ -172,15 +179,18 @@ Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>, Nathan Boley <npboley@gmail
                          choices=["signal.value", "p.value", "q.value"],
                          help='Type of ranking measure to use.')
     
-    parser.add_argument( '--use-nonoverlapping-peaks', action="store_true", default=False,
+    parser.add_argument( '--use-nonoverlapping-peaks', 
+                         action="store_true", default=False,
         help='Use peaks without an overlapping match, setting the value to 0 for signal and 1 for p/qvalue.')
     
     parser.add_argument( '--peak-merge-method', 
                          choices=["sum", "avg", "min", "max"], default=None,
         help="Which method to use for merging peaks. Default: 'mean' for signal, 'min' for p/q-value.")
     
-    parser.add_argument( '--verbose', action="store_true", default=False, help="Print out additional debug information")
-    parser.add_argument( '--quiet', action="store_true", default=False, help="Don't print any status messages")
+    parser.add_argument( '--verbose', action="store_true", default=False, 
+                         help="Print out additional debug information")
+    parser.add_argument( '--quiet', action="store_true", default=False, 
+                         help="Don't print any status messages")
 
     args = parser.parse_args()
 
@@ -195,7 +205,7 @@ Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>, Nathan Boley <npboley@gmail
 
     # decide what aggregation function to use for peaks that need to be merged
     if args.peak_merge_method == None:
-        peak_merge_fn = {"signal.value": mean, "q.value": min, "p.value": min}[
+        peak_merge_fn = {"signal.value": mean, "q.value": mean, "p.value": mean}[
             args.rank]
     else:
         peak_merge_fn = {"sum": sum, "avg": mean, "min": min, "max": max}[
@@ -227,6 +237,12 @@ def main():
     merged_peaks.sort(key=lambda x: x[0] + x[1], reverse=True)
     s1 = numpy.array([x[0] for x in merged_peaks], dtype='d')
     s2 = numpy.array([x[1] for x in merged_peaks], dtype='d')
+    
+    if( len(merged_peaks) < 3 ):
+        error_msg = "Peak files must contain at least 4 peaks post-merge"
+        error_msg += "\nHint: Merged peaks were written to the output file"
+        for pk in merged_peaks: print( pk, file=args.output_file )
+        raise ValueError(error_msg)
     
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)

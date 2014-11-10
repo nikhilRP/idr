@@ -6,7 +6,8 @@ double RationalApproximation(double t)
     // The absolute value of the error should be less than 4.5 e-4.
     double c[] = {2.515517, 0.802853, 0.010328};
     double d[] = {1.432788, 0.189269, 0.001308};
-    return t - ((c[2]*t + c[1])*t + c[0]) / (((d[2]*t + d[1])*t + d[0])*t + 1.0);
+    return t - ((c[2]*t + c[1])*t + c[0]) 
+        / (((d[2]*t + d[1])*t + d[0])*t + 1.0);
 }
 
 double NormalCDFInverse(double p)
@@ -86,7 +87,7 @@ double maximum_likelihood(
     double a, b, d, e, p, q, r, u, v, w, x;
     double t2, fu, fv, fw, fx, xm, eps, tol1, tol3;
 
-    /*  eps is approximately the square root of the relative machine precision. */
+    /* eps is approximately the square root of the relative machine precision.*/
     eps = DBL_EPSILON;
     tol1 = eps + 1.;/* the smallest 1.000... > 1 */
     eps = sqrt(eps);
@@ -380,7 +381,8 @@ em_gaussian(
 
     /* Initialize the set of break points for the histogram averaging */
     int n_bins = 50;
-    
+    if( n_samples-2 < n_bins )
+        n_bins = n_samples-3;
     /*
      * CDF and PDF vectors for the input vectors.
      * Updated everytime for a EM iteration.
@@ -449,9 +451,10 @@ em_gaussian(
                 likelihood[1]-likelihood[0])
                 / (1-(likelihood[2]-likelihood[1])/(
                        likelihood[1]-likelihood[0]));
-            if ( fabs(a_cri-likelihood[2]) <= eps
-                 && fabs(p0 - prev_p) <= eps
-                 && fabs(rho - prev_rho) <= eps)
+            if ( fabs(a_cri-likelihood[2]) <= eps 
+                 || likelihood[2] < likelihood[1] )
+                 //&& fabs(p0 - prev_p) <= eps
+                 //&& fabs(rho - prev_rho) <= eps)
             { break; }
         }
         
