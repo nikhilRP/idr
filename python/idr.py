@@ -238,8 +238,8 @@ def main():
     s1 = numpy.array([x[0] for x in merged_peaks], dtype='d')
     s2 = numpy.array([x[1] for x in merged_peaks], dtype='d')
     
-    if( len(merged_peaks) < 3 ):
-        error_msg = "Peak files must contain at least 4 peaks post-merge"
+    if( len(merged_peaks) < 20 ):
+        error_msg = "Peak files must contain at least 20 peaks post-merge"
         error_msg += "\nHint: Merged peaks were written to the output file"
         for pk in merged_peaks: print( pk, file=args.output_file )
         raise ValueError(error_msg)

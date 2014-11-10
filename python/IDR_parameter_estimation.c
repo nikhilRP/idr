@@ -381,8 +381,8 @@ em_gaussian(
 
     /* Initialize the set of break points for the histogram averaging */
     int n_bins = 50;
-    if( n_samples-2 < n_bins )
-        n_bins = n_samples-3;
+    if( n_samples/5-2 < n_bins )
+        n_bins = n_samples/5-2;
     /*
      * CDF and PDF vectors for the input vectors.
      * Updated everytime for a EM iteration.
