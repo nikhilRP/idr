@@ -235,12 +235,10 @@ void estep_gaussian(
         density_c2[i] is always 1.0
         */
         double numerator = p * density_c1[i] * x1_pdf[i] * y1_pdf[i];
-        printf("%e\t%e\t%e\t%e\n", density_c1[i], x1_cdf[i], y1_cdf[i], density_c1[i]);
         double denominator = numerator + (1-p) * 1.0 * x2_pdf[i] * y2_pdf[i];
         ez[i] = numerator/denominator;
         assert( !isnan(ez[i]) );
     }
-    exit(0);
     free(density_c1);
     // we don't use this - see above
     // free(density_c2);
@@ -360,7 +358,7 @@ em_gaussian(
     int n_samples,
     double* x, 
     double* y,
-    double* localIDR,
+    double* IDRs,
     int print_status_msgs )
 {
     int i;
@@ -419,7 +417,6 @@ em_gaussian(
         
         mstep_gaussian(&p0, &rho, n_samples, 
                        x1_cdf, y1_cdf, ez);
-        if( p0 > 0.35)p0 = 0.35;
 
         estep_gaussian(n_samples,
                        x1_pdf, x2_pdf, 
@@ -465,7 +462,7 @@ em_gaussian(
     
     for(i=0; i<n_samples; ++i)
     {
-        localIDR[i] = 1.0 - ez[i];
+        IDRs[i] = 1.0 - ez[i];
     }
     
     free(ez);

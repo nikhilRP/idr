@@ -106,7 +106,7 @@ def merge_peaks(s1_peaks, s2_peaks, pk_agg_fn):
             key + pk for pk in merge_peaks_in_contig(
                 s1_peaks[key], s2_peaks[key], pk_agg_fn))
     
-    merged_peaks.sort(key=lambda x:pk_agg_fn((x[4],x[5])))
+    merged_peaks.sort(key=lambda x:pk_agg_fn((x[4],x[5])), reverse=True)
     return merged_peaks
 
 def build_rank_vectors(merged_peaks):
@@ -116,25 +116,15 @@ def build_rank_vectors(merged_peaks):
     # add the signal
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
-
-    """
-    # build hte ranks - we add uniform random noise to break ties
-    # len(merged_peaks) - 
-    r1 = numpy.random.random(len(merged_peaks))
-    #s1 = numpy.array(numpy.lexsort((r1, s1)), dtype=float)
-    s1 = numpy.array((s1+r1).argsort(), dtype='d')
-
-    r2 = numpy.random.random(len(merged_peaks))
-    #s2 = numpy.array(numpy.lexsort((r2, s2)), dtype=float)
-    s2 = numpy.array((s2+r2).argsort(), dtype='d')
-    """
     
-    rv1 = numpy.array(s1.argsort(), dtype='d')
-    rv2 = numpy.array(s2.argsort(), dtype='d')
+    rv1 = numpy.array(len(s1) - s1.argsort(), dtype='d')
+    rv2 = numpy.array(len(s2) - s2.argsort(), dtype='d')
     
     return rv1, rv2
 
-def build_idr_output_line(contig, strand, signals, merged_peak, localIDR, globalIDR):
+def build_idr_output_line(
+    contig, strand, signals, merged_peak, 
+    IDR, localIDR, r1, r2):
     rv = [contig,]
     for signal, key in zip(signals, (1,2)):
         if len(merged_peak[key]) == 0: 
@@ -144,9 +134,12 @@ def build_idr_output_line(contig, strand, signals, merged_peak, localIDR, global
             rv.append( "%i" % max(x[1] for x in merged_peak[key]))
         rv.append( "%.5f" % signal )
     
-    rv.append("%.5f" % globalIDR)
+    rv.append("%.5f" % IDR)
     rv.append("%.5f" % localIDR)
     rv.append(strand)
+    
+    rv.append("%i" % r1)
+    rv.append("%i" % r2)
     
     return "\t".join(rv)
 
@@ -231,14 +224,14 @@ def main():
     log("Ranking peaks", 'VERBOSE');
     s1, s2 = build_rank_vectors(merged_peaks)
     merged_peaks = list(zip( s1, s2, merged_peaks ))
-    merged_peaks.sort(key=lambda x: x[0] + x[1])
+    merged_peaks.sort(key=lambda x: x[0] + x[1], reverse=True)
     s1 = numpy.array([x[0] for x in merged_peaks], dtype='d')
     s2 = numpy.array([x[1] for x in merged_peaks], dtype='d')
     
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)
     log("Fitting the model parameters", 'VERBOSE');
-    (n_iter, rho, p), localIDRs = em_gaussian(s1, s2)
+    (n_iter, rho, p), IDRs = em_gaussian(s1, s2)
     
     log("Finished running IDR on the datasets");
     log("Final P value = %.15f" % p);
@@ -247,22 +240,24 @@ def main():
     
     # build the global IDR array
     log("Building the global IDR array", 'VERBOSE');
-    merged_data = sorted(zip(localIDRs, merged_peaks), reverse=True)
-    globalIDRs = [merged_data[0][0],]
-    for i, (localIDR, merged_peak) in enumerate(merged_data[1:]):
-        globalIDRs.append( (localIDR + globalIDRs[i])/(i+2) )
-
+    merged_data = sorted(zip(IDRs, merged_peaks))
+    localIDRs = [merged_data[0][0],]
+    for i, (IDR, merged_peak) in enumerate(merged_data[1:]):
+        localIDRs.append( (IDR + localIDRs[i])/(i+2) )
+    
     # write out the ouput
     log("Writing results to file", "VERBOSE");
     num_peaks_passing_thresh = 0
-    for globalIDR, (localIDR, (r1, r2, merged_peak)) in zip(globalIDRs, merged_data):
+    for localIDR, (IDR, (r1, r2, merged_peak)) in zip(
+            localIDRs, merged_data):
         # skip peaks with global idr values below the threshold
-        if globalIDR > args.idr: continue
+        if IDR > args.idr: continue
         num_peaks_passing_thresh += 1
         opline = build_idr_output_line(
             merged_peak[0], merged_peak[1], 
             merged_peak[4:6], 
-            merged_peak[6], localIDR, globalIDR)
+            merged_peak[6], IDR, localIDR, 
+            r1, r2)
         print( opline, file=args.output_file )
 
     log("Number of peaks passing IDR cutoff of {} - {}\n".format(
