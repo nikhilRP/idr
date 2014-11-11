@@ -32,8 +32,8 @@ def em_gaussian(ranks_1, ranks_2):
     localIDR = numpy.zeros(n, dtype='d')
     rv = C_em_gaussian(
         ctypes.c_int(n), 
-        ranks_1.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        ranks_2.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+        ranks_1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        ranks_2.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
         localIDR.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
         (ctypes.c_int(1) if VERBOSE else ctypes.c_int(0)) )
     n_iters, rho, p = rv.n_iters, rv.rho, rv.p
@@ -126,7 +126,7 @@ def build_rank_vectors(merged_peaks):
     rank1 = numpy.lexsort((numpy.random.random(len(s1)), -s1)).argsort()
     rank2 = numpy.lexsort((numpy.random.random(len(s2)), -s2)).argsort()
     
-    return rank1, rank2
+    return numpy.array(rank1, dtype='i'), numpy.array(rank2, dtype='i')
 
 def build_idr_output_line(
     contig, strand, signals, merged_peak, IDR, localIDR):
@@ -229,10 +229,6 @@ def main():
     # build the ranks vector
     log("Ranking peaks", 'VERBOSE');
     s1, s2 = build_rank_vectors(merged_peaks)
-    merged_peaks = sorted(zip(s1, s2, merged_peaks), 
-                          key=lambda x: x[0], reverse=True)
-    s1 = numpy.array([x[0] for x in merged_peaks], dtype='i')
-    s2 = numpy.array([x[1] for x in merged_peaks], dtype='i')
     
     if( len(merged_peaks) < 20 ):
         error_msg = "Peak files must contain at least 20 peaks post-merge"
@@ -260,7 +256,7 @@ def main():
     # write out the ouput
     log("Writing results to file", "VERBOSE");
     num_peaks_passing_thresh = 0
-    for localIDR, (IDR, (r1, r2, merged_peak)) in zip(
+    for localIDR, (IDR, merged_peak) in zip(
             localIDRs, merged_data):
         # skip peaks with global idr values below the threshold
         if IDR > args.idr: continue
