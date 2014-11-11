@@ -233,12 +233,10 @@ void estep_gaussian(
         density_c2[i] is always 1.0
         */
         double numerator = p * density_c1[i] * x1_pdf[i] * y1_pdf[i];
-        printf("%e\t%e\t%e\t%e\n", density_c1[i], x1_cdf[i], y1_cdf[i]);
         double denominator = numerator + (1-p) * 1.0 * x2_pdf[i] * y2_pdf[i];
         ez[i] = numerator/denominator;
         assert( !isnan(ez[i]) );
     }
-    exit(0);
     free(density_c1);
     // we don't use this - see above
     // free(density_c2);
