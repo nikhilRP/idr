@@ -8,7 +8,8 @@ class c_OptimizationRV(ctypes.Structure):
                 ("p", ctypes.c_double)]
                 
 C_em_gaussian = ctypes.cdll.LoadLibrary(
-    "./IDR_parameter_estimation.so").em_gaussian
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                 "IDR_parameter_estimation.so")).em_gaussian
 C_em_gaussian.restype = c_OptimizationRV
 
 import numpy
@@ -194,7 +195,9 @@ Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>
     if args.verbose: VERBOSE = True 
 
     global QUIET
-    if args.quiet: QUIET = True 
+    if args.quiet: 
+        QUIET = True 
+        VERBOSE = False
 
     global IGNORE_NONOVERLAPPING_PEAKS
     IGNORE_NONOVERLAPPING_PEAKS = not args.use_nonoverlapping_peaks
