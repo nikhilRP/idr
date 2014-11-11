@@ -123,14 +123,13 @@ def build_rank_vectors(merged_peaks):
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
     
-    rank1 = numpy.lexsort((numpy.random.random(len(s1)), -s1))
-    rank2 = numpy.lexsort((numpy.random.random(len(s2)), -s2))
+    rank1 = numpy.lexsort((numpy.random.random(len(s1)), -s1)).argsort()
+    rank2 = numpy.lexsort((numpy.random.random(len(s2)), -s2)).argsort()
     
-    return numpy.array(rank1, dtype='d'), numpy.array(rank2, dtype='d')
+    return rank1, rank2
 
 def build_idr_output_line(
-    contig, strand, signals, merged_peak, 
-    IDR, localIDR, r1, r2):
+    contig, strand, signals, merged_peak, IDR, localIDR):
     rv = [contig,]
     for signal, key in zip(signals, (1,2)):
         if len(merged_peak[key]) == 0: 
@@ -143,10 +142,7 @@ def build_idr_output_line(
     rv.append("%.5f" % IDR)
     rv.append("%.5f" % localIDR)
     rv.append(strand)
-    
-    rv.append("%i" % r1)
-    rv.append("%i" % r2)
-    
+        
     return "\t".join(rv)
 
 def parse_args():
@@ -233,10 +229,10 @@ def main():
     # build the ranks vector
     log("Ranking peaks", 'VERBOSE');
     s1, s2 = build_rank_vectors(merged_peaks)
-    merged_peaks = list(zip( s1, s2, merged_peaks ))
-    merged_peaks.sort(key=lambda x: x[0] + x[1], reverse=True)
-    s1 = numpy.array([x[0] for x in merged_peaks], dtype='d')
-    s2 = numpy.array([x[1] for x in merged_peaks], dtype='d')
+    merged_peaks = sorted(zip(s1, s2, merged_peaks), 
+                          key=lambda x: x[0], reverse=True)
+    s1 = numpy.array([x[0] for x in merged_peaks], dtype='i')
+    s2 = numpy.array([x[1] for x in merged_peaks], dtype='i')
     
     if( len(merged_peaks) < 20 ):
         error_msg = "Peak files must contain at least 20 peaks post-merge"
@@ -272,8 +268,7 @@ def main():
         opline = build_idr_output_line(
             merged_peak[0], merged_peak[1], 
             merged_peak[4:6], 
-            merged_peak[6], IDR, localIDR, 
-            r1, r2)
+            merged_peak[6], IDR, localIDR )
         print( opline, file=args.output_file )
 
     log("Number of peaks passing IDR cutoff of {} - {}\n".format(

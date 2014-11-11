@@ -25,8 +25,8 @@ struct OptimizationRV
 struct OptimizationRV
 em_gaussian(
     int n_samples,
-    double* x, 
-    double* y,
+    int* x, 
+    int* y,
     double* IDRs,
     int print_status_msgs);
 

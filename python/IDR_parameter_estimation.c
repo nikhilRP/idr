@@ -276,7 +276,7 @@ build_cumsum(int nbins, double* bin_dens, double* bin_cumsum)
 /* use a histogram estimator to estimate the marginal distributions */
 void estimate_marginals(
     int n_samples,
-    double* input, 
+    int* input, 
     double* pdf_1, 
     double* pdf_2,
     double* cdf_1, 
@@ -298,7 +298,8 @@ void estimate_marginals(
     
     for(i=0; i<n_samples; ++i)
     {
-        int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
+        assert( input[i] >= 0 && input[i] < n_samples);
+        int bin_i = (nbins*input[i])/n_samples;
         bin_dens_1[bin_i] += ez[i];
         bin_dens_2[bin_i] += (1-ez[i]);        
     }
@@ -319,7 +320,7 @@ void estimate_marginals(
     /* set the pdf variables */
     for(i=0; i<n_samples; ++i)
     {
-        int bin_i = (int) (nbins*(input[i]/(n_samples+1)));
+        int bin_i = (nbins*input[i])/n_samples;
         pdf_1[i] = bin_dens_1[bin_i];
         pdf_2[i] = bin_dens_2[bin_i];
         cdf_1[i] = bin_cumsum_1[bin_i];
@@ -357,8 +358,8 @@ void mstep_gaussian(
 struct OptimizationRV
 em_gaussian(
     int n_samples,
-    double* x, 
-    double* y,
+    int* x, 
+    int* y,
     double* IDRs,
     int print_status_msgs )
 {
