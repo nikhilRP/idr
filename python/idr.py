@@ -1,5 +1,7 @@
 import os, sys
 
+import math
+
 import ctypes
 
 class c_OptimizationRV(ctypes.Structure):
@@ -27,7 +29,9 @@ QUIET = False
 
 IGNORE_NONOVERLAPPING_PEAKS = False
 
-def em_gaussian(ranks_1, ranks_2):
+from pseudo_value_method import em_gaussian
+
+def em_gaussian_old(ranks_1, ranks_2):
     n = len(ranks_1)
     assert( n == len(ranks_1) == len(ranks_2) )
     localIDR = numpy.zeros(n, dtype='d')
@@ -39,6 +43,7 @@ def em_gaussian(ranks_1, ranks_2):
         (ctypes.c_int(1) if VERBOSE else ctypes.c_int(0)) )
     n_iters, rho, p = rv.n_iters, rv.rho, rv.p
     return (n_iters, rho, p), localIDR
+
 
 def load_bed(fp, signal_type):
     signal_index = {"signal.value": 6, "p.value": 7, "q.value": 8}[signal_type]
@@ -123,7 +128,7 @@ def build_rank_vectors(merged_peaks):
     # add the signal
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
-    
+
     rank1 = numpy.lexsort((numpy.random.random(len(s1)), -s1)).argsort()
     rank2 = numpy.lexsort((numpy.random.random(len(s2)), -s2)).argsort()
     
@@ -239,6 +244,8 @@ def main():
         for pk in merged_peaks: print( pk, file=args.output_file )
         raise ValueError(error_msg)
     
+    em_gaussian(s1, s2, (1, 1, 0.5, 0.5)) # mu, sigma, rho, p
+    return
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)
     log("Fitting the model parameters", 'VERBOSE');
