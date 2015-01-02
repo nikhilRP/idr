@@ -69,42 +69,6 @@ def compute_lhd_2(mu_1, mu_2, sigma_1, sigma_2, rho, z1, z2):
     )
     return loglik
 
-def update_mixture_params_estimate(z1, z2, starting_point):
-    i_mu, i_sigma, i_rho, i_p = starting_point
-    
-    noise_log_lhd = compute_lhd_2(0,0, 1,1, 0, z1, z2)
-    signal_log_lhd = compute_lhd_2(
-        i_mu[0], i_mu[1], i_sigma[0], i_sigma[1], i_rho, z1, z2)
-    
-    ez = i_p*numpy.exp(signal_log_lhd)/(
-        i_p*numpy.exp(signal_log_lhd)+(1-i_p)*numpy.exp(noise_log_lhd))
-    
-    # just a small optimization
-    ez_sum = ez.sum()
-    
-    p = ez_sum/len(ez)
-    
-    mu_1 = (ez*z1).sum()/(ez_sum)
-    mu_2 = (ez*z2).sum()/(ez_sum)
-    mu = (mu_1 + mu_2)/2
-    #mu = 1
-    
-    weighted_sum_sqs_1 = (ez*((z1-mu)**2)).sum()
-    weighted_sum_sqs_2 = (ez*((z2-mu)**2)).sum()
-    sigma = math.sqrt((weighted_sum_sqs_1+weighted_sum_sqs_2)/(2*ez_sum))
-    #print(weighted_sum_sqs_1, weighted_sum_sqs_2, ez_sum)
-    
-    rho = 2*(ez*(z1-mu)*(z2-mu)).sum()/(
-        weighted_sum_sqs_1 + weighted_sum_sqs_2)
-    #rho = 0.9
-    #rho = (ez*(z1-mu)*(z2-mu)).sum()/(2*ez_sum)
-    #rho = max(0.01, rho)
-    #rho = 0.5
-
-    jnt_log_lhd = numpy.log(
-        p*numpy.exp(signal_log_lhd) + (1-p)*numpy.exp(noise_log_lhd)).sum()
-    return ((mu, mu), (sigma, sigma), rho, p), jnt_log_lhd, jnt_log_lhd
-
 def update_mixture_params_estimate_fixed(z1, z2, starting_point):
     i_mu, i_sigma, i_rho, i_p = starting_point
     
@@ -164,13 +128,94 @@ def update_mixture_params_estimate_full(z1, z2, starting_point):
     
     return ((mu_1, mu_2), (sigma_1, sigma_1), rho, p), jnt_log_lhd, jnt_log_lhd
 
+
+def update_mixture_params_estimate_OLD(z1, z2, starting_point):
+    i_mu, i_sigma, i_rho, i_p = starting_point
+    
+    noise_log_lhd = compute_lhd_2(0,0, 1,1, 0, z1, z2)
+    signal_log_lhd = compute_lhd_2(
+        i_mu[0], i_mu[1], i_sigma[0], i_sigma[1], i_rho, z1, z2)
+    
+    ez = i_p*numpy.exp(signal_log_lhd)/(
+        i_p*numpy.exp(signal_log_lhd)+(1-i_p)*numpy.exp(noise_log_lhd))
+    
+    # just a small optimization
+    ez_sum = ez.sum()
+    
+    p = ez_sum/len(ez)
+    
+    mu_1 = (ez*z1).sum()/(ez_sum)
+    mu_2 = (ez*z2).sum()/(ez_sum)
+    mu = (mu_1 + mu_2)/2
+    mu = 1
+    
+    weighted_sum_sqs_1 = (ez*((z1-mu)**2)).sum()
+    weighted_sum_sqs_2 = (ez*((z2-mu)**2)).sum()
+    weighted_sum_prod = (ez*(z2-mu)*(z1-mu)).sum()
+
+    sigma = math.sqrt((weighted_sum_sqs_1+weighted_sum_sqs_2)/(2*ez_sum))
+    #print(weighted_sum_sqs_1, weighted_sum_sqs_2, ez_sum)
+    
+    rho = 2*(ez*(z1-mu)*(z2-mu)).sum()/(
+        weighted_sum_sqs_1 + weighted_sum_sqs_2)
+    
+    jnt_log_lhd = numpy.log(
+        p*numpy.exp(signal_log_lhd) + (1-p)*numpy.exp(noise_log_lhd)).sum()
+    return ((mu, mu), (sigma, sigma), rho, p), jnt_log_lhd, jnt_log_lhd
+
+def update_mixture_params_estimate(z1, z2, starting_point):
+    mu, sigma, rho, p = starting_point
+    mu = 1
+    sigma = 1
+    
+    prev_lhd = None
+    for i in range(10000):
+        noise_log_lhd = compute_lhd_2(0,0, 1,1, 0, z1, z2)
+        signal_log_lhd = compute_lhd_2(
+            mu, mu, sigma, sigma, rho, z1, z2)
+        
+        ez = p*numpy.exp(signal_log_lhd)/(
+            p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd))
+        ez_sum = ez.sum()
+
+        weighted_sum_sqs_1 = (ez*((z1-mu)**2)).sum()
+        weighted_sum_sqs_2 = (ez*((z2-mu)**2)).sum()
+        weighted_sum_prod = (ez*(z2-mu)*(z1-mu)).sum()    
+        
+        rho_grad = rho*(rho*rho-1)*ez_sum - (rho*rho+1)*weighted_sum_prod +rho*(
+            weighted_sum_sqs_1 + weighted_sum_sqs_2)
+        rho_grad /= (1-rho*rho)*(1-rho*rho)
+    
+        p_grad = numpy.exp(signal_log_lhd) - numpy.exp(noise_log_lhd)
+        p_grad /= p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd)
+        p_grad = p_grad.sum()
+
+        mu_grad = (ez*(((z1-mu)+(z2-mu))/(1-rho*rho))).sum()
+        
+        log_lhd = numpy.log(p*numpy.exp(signal_log_lhd)
+                            +(1-p)*numpy.exp(noise_log_lhd)).sum()
+        print(log_lhd, mu_grad, sigma, rho_grad, p_grad)
+
+        assert prev_lhd == None or log_lhd - prev_lhd + EPS > 0
+        if prev_lhd != None and abs(log_lhd-prev_lhd) < EPS and (
+            mu_grad < 1e-2 and p_grad < 1e-2 and rho_grad < 1e-2): 
+            return ( ((mu, mu), (sigma, sigma), rho, p), 
+                     log_lhd, log_lhd )
+        else:
+            prev_lhd = log_lhd
+            rho -= 1e-6*rho_grad
+            p += 1e-6*p_grad
+            mu += 1e-6*mu_grad
+    
+    assert False
+
 def estimate_mixture_params(r1_values, r2_values, params):
     prev_lhd = None
     for i in range(MAX_NUM_EM_ITERS):
-        new_params, joint_lhd, other_lhd = update_mixture_params_estimate(
+        new_params, joint_lhd, other_lhd = update_mixture_params_estimate_OLD(
             r1_values, r2_values, params)
-        #if prev_lhd != None: 
-        #    print( joint_lhd, joint_lhd-prev_lhd, new_params )
+        if prev_lhd != None: 
+            print( joint_lhd, joint_lhd-prev_lhd, new_params )
         
         assert i < 2 or prev_lhd == None or joint_lhd + 10*EPS > prev_lhd, str(
             joint_lhd + 10*EPS-prev_lhd)
@@ -197,8 +242,8 @@ def em_gaussian(ranks_1, ranks_2, params):
     max_lhd, max_index = -1e9, -1
     for i in range(MAX_NUM_PSUEDO_VAL_ITER):
         mu, sigma, rho, p = params
-        z1 = compute_pseudo_values(ranks_1, mu[0], sigma[1], p)
-        z2 = compute_pseudo_values(ranks_2, mu[0], sigma[1], p)
+        z1 = compute_pseudo_values(ranks_1, mu[0], sigma[0], p)
+        z2 = compute_pseudo_values(ranks_2, mu[1], sigma[1], p)
         params, joint_lhd, other_lhd, ez = estimate_mixture_params(
             z1, z2, params)
         print( joint_lhd, ez, params )
@@ -215,12 +260,13 @@ def em_gaussian(ranks_1, ranks_2, params):
 
 def main():
     #params = (mu, sigma, rho, p)
-    for i in range(100):
+    for i in range(1):
         params = (1, 1, 0.9, 0.5)
         (r1_ranks, r2_ranks), (r1_values, r2_values) = simulate_values(
             10000, params)
-        params = ((1,1), (1,1), 0.9, 0.5)
-        print( estimate_mixture_params(r1_values, r2_values, params) )
+        params = ((1,1), (1,1), 0.1, 0.9)
+        print( update_mixture_params_estimate(r1_values, r2_values, params) )
+        #print( estimate_mixture_params(r1_values, r2_values, params) )
     
     return
     params = (1, 1, 0.9, 0.5)
