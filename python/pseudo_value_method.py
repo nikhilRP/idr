@@ -3,6 +3,8 @@ import os, sys
 from scipy.stats import norm
 import scipy.stats
 
+from scipy.optimize import fminbound
+
 import numpy
 
 import math
@@ -162,58 +164,136 @@ def update_mixture_params_estimate_OLD(z1, z2, starting_point):
         p*numpy.exp(signal_log_lhd) + (1-p)*numpy.exp(noise_log_lhd)).sum()
     return ((mu, mu), (sigma, sigma), rho, p), jnt_log_lhd, jnt_log_lhd
 
-def update_mixture_params_estimate(z1, z2, starting_point):
-    mu, sigma, rho, p = starting_point
-    mu = mu[0]
-    sigma = sigma[0]
+def calc_log_lhd(theta, z1, z2):
+    mu, sigma, rho, p = theta
     
-    prev_lhd = None
-    for i in range(10000):
-        noise_log_lhd = compute_lhd_2(0,0, 1,1, 0, z1, z2)
-        signal_log_lhd = compute_lhd_2(
-            mu, mu, sigma, sigma, rho, z1, z2)
-        
-        ez = p*numpy.exp(signal_log_lhd)/(
-            p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd))
-        ez_sum = ez.sum()
+    noise_log_lhd = compute_lhd_2(0,0, 1,1, 0, z1, z2)
+    signal_log_lhd = compute_lhd_2(
+        mu, mu, sigma, sigma, rho, z1, z2)
 
-        std_z1 = (z1-mu)/sigma
-        std_z2 = (z2-mu)/sigma
-        
-        weighted_sum_sqs_1 = (ez*(std_z1**2)).sum()
-        weighted_sum_sqs_2 = (ez*((std_z2)**2)).sum()
-        weighted_sum_prod = (ez*std_z2*std_z1).sum()    
-        
-        rho_grad = rho*(rho*rho-1)*ez_sum - (rho*rho+1)*weighted_sum_prod +rho*(
-            weighted_sum_sqs_1 + weighted_sum_sqs_2)
-        rho_grad /= (1-rho*rho)*(1-rho*rho)
+    log_lhd = numpy.log(p*numpy.exp(signal_log_lhd)
+                        +(1-p)*numpy.exp(noise_log_lhd)).sum()
     
-        p_grad = numpy.exp(signal_log_lhd) - numpy.exp(noise_log_lhd)
-        p_grad /= p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd)
-        p_grad = p_grad.sum()
+    return log_lhd
 
+def calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma):
+    mu, sigma, rho, p = theta
+
+    noise_log_lhd = compute_lhd_2(0,0, 1,1, 0, z1, z2)
+    signal_log_lhd = compute_lhd_2(
+        mu, mu, sigma, sigma, rho, z1, z2)
+
+    # calculate the likelihood ratio for each statistic
+    ez = p*numpy.exp(signal_log_lhd)/(
+        p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd))
+    ez_sum = ez.sum()
+
+    # startndardize the values
+    std_z1 = (z1-mu)/sigma
+    std_z2 = (z2-mu)/sigma
+
+    # calculate the weighted statistics - we use these for the 
+    # gradient calculations
+    weighted_sum_sqs_1 = (ez*(std_z1**2)).sum()
+    weighted_sum_sqs_2 = (ez*((std_z2)**2)).sum()
+    weighted_sum_prod = (ez*std_z2*std_z1).sum()    
+
+    if fix_mu:
+        mu_grad = 0
+    else:
         mu_grad = (ez*((std_z1+std_z2)/(1-rho*rho))).sum()
-        
-        sigma_grad = weighted_sum_sqs_1 + weighted_sum_sqs_2 - 2*rho*weighted_sum_prod
+
+    if fix_sigma:
+        sigma_grad = 0
+    else:
+        sigma_grad = (
+            weighted_sum_sqs_1 
+            + weighted_sum_sqs_2 
+            - 2*rho*weighted_sum_prod )
         sigma_grad /= (1-rho*rho)
         sigma_grad -= 2*ez_sum
         sigma_grad /= sigma
-        
-        log_lhd = numpy.log(p*numpy.exp(signal_log_lhd)
-                            +(1-p)*numpy.exp(noise_log_lhd)).sum()
-        print(log_lhd, mu_grad, sigma, sigma_grad, rho_grad, p_grad)
 
-        assert prev_lhd == None or log_lhd - prev_lhd + EPS > 0
-        if prev_lhd != None and abs(log_lhd-prev_lhd) < EPS and (
-            mu_grad < 1e-2 and p_grad < 1e-2 and rho_grad < 1e-2): 
-            return ( ((mu, mu), (sigma, sigma), rho, p), 
+    rho_grad = -rho*(rho*rho-1)*ez_sum + (rho*rho+1)*weighted_sum_prod - rho*(
+        weighted_sum_sqs_1 + weighted_sum_sqs_2)
+    rho_grad /= (1-rho*rho)*(1-rho*rho)
+
+    p_grad = numpy.exp(signal_log_lhd) - numpy.exp(noise_log_lhd)
+    p_grad /= p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd)
+    p_grad = p_grad.sum()
+    
+    return numpy.array((mu_grad, sigma_grad, rho_grad, p_grad))
+
+def update_mixture_params_estimate(z1, z2, starting_point, 
+                                   fix_mu=False, fix_sigma=False ):
+    mu, sigma, rho, p = starting_point
+    theta = numpy.array((mu[0], sigma[0], rho, p))
+
+    def bnd_calc_log_lhd(theta):
+        return calc_log_lhd(theta, z1, z2)
+
+    def bnd_calc_log_lhd_gradient(theta):
+        grad = calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
+        print(grad)
+        grad[(grad < 0)&(theta <= 0.02)] = 0
+        if grad[2] > 0 and theta[2] >= 0.98:
+            grad[2] = 0
+        if grad[3] > 0 and theta[3] >= 0.98:
+            grad[3] = 0
+        print(grad)
+        return grad
+    
+    def clip_theta(theta):
+        return numpy.clip(theta,
+                          1e-2 + numpy.zeros(4), 
+                          numpy.array((1e9, 1e9, 0.99, 0.99)))
+    
+    prev_lhd = bnd_calc_log_lhd(theta)
+
+    for i in range(10000):
+        def bnd_objective(alpha):
+            new_theta = clip_theta(
+                theta + alpha*bnd_calc_log_lhd_gradient(theta) )
+            return -bnd_calc_log_lhd( new_theta )
+        
+        # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
+        #grad = bnd_calc_log_lhd_gradient(theta)
+        # theta[i] + gradient[i]*alpha > 0
+        # gradient[i]*alpha > -theta[i]
+        # if gradient[i] > 0:
+        #     alpha < theta[i]/gradient[i]
+        # elif gradient[i] < 0:
+        #     alpha < -theta[i]/gradient[i]
+        max_alpha = 1
+        """
+        for param_val, grad_val in zip(theta, grad):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, param_val/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, -param_val/grad_val)
+        
+        # theta[3] + gradient[3]*alpha < 1
+        # gradient[3]*alpha < 1 - theta[3]
+        # if gradient[2] > 0:
+        #     alpha < (1 - theta[3])/gradient[3]
+        # elif gradient[2] < 0:
+        #     alpha < (theta[3] - 1)/gradient[3]
+        for param_val, grad_val in zip(theta[2:], grad[2:]):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, (1-param_val)/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, (param_val-1)/grad_val)
+        """
+        alpha = fminbound(bnd_objective, 0, max_alpha)
+        log_lhd = -bnd_objective(alpha)
+        if abs(log_lhd-prev_lhd) < EPS:
+            return ( ((theta[0], theta[0]), 
+                      (theta[1], theta[1]), 
+                      rho, p),
                      log_lhd, log_lhd )
         else:
             prev_lhd = log_lhd
-            rho -= 1e-6*rho_grad
-            p += 1e-6*p_grad
-            mu += 1e-6*mu_grad
-            sigma += 1e-6*sigma_grad
+            theta = clip_theta(theta + alpha*bnd_calc_log_lhd_gradient(theta))
         
     assert False
 
@@ -274,7 +354,7 @@ def main():
             10000, params)
         params = ((1,1), (1,1), 0.1, 0.9)
         print( update_mixture_params_estimate(r1_values, r2_values, params) )
-        print( estimate_mixture_params(r1_values, r2_values, params) )
+        #print( estimate_mixture_params(r1_values, r2_values, params) )
     
     return
     params = (1, 1, 0.9, 0.5)
