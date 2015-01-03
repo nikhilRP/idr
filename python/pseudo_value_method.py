@@ -235,19 +235,10 @@ def update_mixture_params_estimate(z1, z2, starting_point,
     def bnd_calc_log_lhd_gradient(theta):
         return calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
     
-    def clip_theta(theta):
-        return theta
-    
-    prev_lhd = bnd_calc_log_lhd(theta)
-
-    for i in range(10000):
-        def bnd_objective(alpha):
-            new_theta = clip_theta(
-                theta + alpha*bnd_calc_log_lhd_gradient(theta) )
-            return -bnd_calc_log_lhd( new_theta )
-        
+    def find_max_step_size(theta):
         # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
-        #grad = bnd_calc_log_lhd_gradient(theta)
+        grad = bnd_calc_log_lhd_gradient(theta)
+        ## everything is greater than 0 constraint
         # theta[i] + gradient[i]*alpha > 0
         # gradient[i]*alpha > -theta[i]
         # if gradient[i] > 0:
@@ -261,6 +252,7 @@ def update_mixture_params_estimate(z1, z2, starting_point,
             elif grad_val < -1e-6:
                 max_alpha = min(max_alpha, -param_val/grad_val)
         
+        ## correlation and mix param are less than 1 constraint
         # theta[3] + gradient[3]*alpha < 1
         # gradient[3]*alpha < 1 - theta[3]
         # if gradient[2] > 0:
@@ -273,16 +265,25 @@ def update_mixture_params_estimate(z1, z2, starting_point,
             elif grad_val < -1e-6:
                 max_alpha = min(max_alpha, (param_val-1)/grad_val)
         
-        alpha = fminbound(bnd_objective, 0, max_alpha)
+        return max_alpha
+    
+    prev_lhd = bnd_calc_log_lhd(theta)
+
+    for i in range(10000):
+        def bnd_objective(alpha):
+            new_theta = theta + alpha*bnd_calc_log_lhd_gradient(theta)
+            return -bnd_calc_log_lhd( new_theta )
+                
+        alpha = fminbound(bnd_objective, 0, find_max_step_size(theta))
         log_lhd = -bnd_objective(alpha)
         if abs(log_lhd-prev_lhd) < EPS:
             return ( ((theta[0], theta[0]), 
                       (theta[1], theta[1]), 
-                      rho, p),
-                     log_lhd, log_lhd )
+                      theta[2], theta[3]), 
+                     log_lhd )
         else:
             prev_lhd = log_lhd
-            theta = clip_theta(theta + alpha*bnd_calc_log_lhd_gradient(theta))
+            theta += alpha*bnd_calc_log_lhd_gradient(theta)
         
     assert False
 
@@ -291,8 +292,6 @@ def estimate_mixture_params(r1_values, r2_values, params):
     for i in range(MAX_NUM_EM_ITERS):
         new_params, joint_lhd, other_lhd = update_mixture_params_estimate_OLD(
             r1_values, r2_values, params)
-        if prev_lhd != None: 
-            print( joint_lhd, joint_lhd-prev_lhd, new_params )
         
         assert i < 2 or prev_lhd == None or joint_lhd + 10*EPS > prev_lhd, str(
             joint_lhd + 10*EPS-prev_lhd)
@@ -306,46 +305,53 @@ def estimate_mixture_params(r1_values, r2_values, params):
                 new_params[2], 
                 r1_values, r2_values)
             ez = signal_log_lhd/(noise_log_lhd + signal_log_lhd + EPS)
-            return new_params, joint_lhd, other_lhd, ez.sum()/len(ez)
+            return new_params, joint_lhd
         
         params = new_params
         prev_lhd = joint_lhd
     
     raise RuntimeError( "Max num iterations exceeded in EM procedure" )
 
-def em_gaussian(ranks_1, ranks_2, params):
+def em_gaussian(ranks_1, ranks_2, params, 
+                use_EM=False, fix_mu=False, fix_sigma=False):
     lhds = []
     param_path = []
-    max_lhd, max_index = -1e9, -1
+    prev_lhd = None
     for i in range(MAX_NUM_PSUEDO_VAL_ITER):
         mu, sigma, rho, p = params
         z1 = compute_pseudo_values(ranks_1, mu[0], sigma[0], p)
         z2 = compute_pseudo_values(ranks_2, mu[1], sigma[1], p)
-        params, joint_lhd, other_lhd, ez = estimate_mixture_params(
-            z1, z2, params)
-        print( joint_lhd, ez, params )
-        lhds.append(joint_lhd)
+        if use_EM:
+            params, log_lhd = estimate_mixture_params(
+                z1, z2, params)
+        else:
+            params, log_lhd = update_mixture_params_estimate(
+                z1, z2, params, fix_mu, fix_sigma)
+
+        lhds.append(log_lhd)
         param_path.append(params)
-        diff = joint_lhd - max_lhd
-        if i > 10 and diff < 1e-4: # or diff < -1:
-            return max_lhd, param_path[max_lhd_index]
-        elif joint_lhd > max_lhd:
-            max_lhd, max_lhd_index = joint_lhd, i
+
+        print( i, end=" ", flush=True) # params, log_lhd
+        if prev_lhd != None and abs(log_lhd - prev_lhd) < 1e-2:
+            return params, log_lhd
+        prev_lhd = log_lhd
 
     raise RuntimeError( "Max num iterations exceeded in pseudo val procedure" )
     
 
 def main():
     #params = (mu, sigma, rho, p)
+    """
     for i in range(1):
         params = (1, 1, 0.9, 0.5)
         (r1_ranks, r2_ranks), (r1_values, r2_values) = simulate_values(
             10000, params)
         params = ((1,1), (1,1), 0.1, 0.9)
         print( update_mixture_params_estimate(r1_values, r2_values, params) )
-        #print( estimate_mixture_params(r1_values, r2_values, params) )
+        print( estimate_mixture_params(r1_values, r2_values, params) )
     
     return
+    """
     params = (1, 1, 0.9, 0.5)
     (r1_ranks, r2_ranks), (r1_values, r2_values) = simulate_values(10000, params)
     import pylab
@@ -353,8 +359,24 @@ def main():
     #pylab.scatter(r1_ranks, r2_ranks)
     #pylab.show()
     #return
-    params = ((1,1), (1,1), 0.1, 0.9)
-    em_gaussian(r1_ranks, r2_ranks, params)
+    init_params = ((1,1), (1,1), 0.1, 0.9)
+    #params, log_lhd = update_mixture_params_estimate(
+    #    r1_values, r2_values, init_params)
+    #print(params, log_lhd)
+    
+    params, log_lhd = em_gaussian(r1_ranks, r2_ranks, init_params, True)
+    print("\nEM", params, log_lhd)
+    
+    params, log_lhd = em_gaussian(r1_ranks, r2_ranks, init_params, 
+                                  False, True, True)
+    print("\nGA", params, log_lhd)
+    params, log_lhd = em_gaussian(r1_ranks, r2_ranks, params, 
+                                  False, False, True)
+    print("\nGA", params, log_lhd)
+    params, log_lhd = em_gaussian(r1_ranks, r2_ranks, params, 
+                                  False, False, False)
+    print("\nGA", params, log_lhd)
+
     return
     
     print( estimate_mixture_params(r1_values, r2_values, params) )
