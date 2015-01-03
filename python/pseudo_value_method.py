@@ -233,20 +233,10 @@ def update_mixture_params_estimate(z1, z2, starting_point,
         return calc_log_lhd(theta, z1, z2)
 
     def bnd_calc_log_lhd_gradient(theta):
-        grad = calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
-        print(grad)
-        grad[(grad < 0)&(theta <= 0.02)] = 0
-        if grad[2] > 0 and theta[2] >= 0.98:
-            grad[2] = 0
-        if grad[3] > 0 and theta[3] >= 0.98:
-            grad[3] = 0
-        print(grad)
-        return grad
+        return calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
     
     def clip_theta(theta):
-        return numpy.clip(theta,
-                          1e-2 + numpy.zeros(4), 
-                          numpy.array((1e9, 1e9, 0.99, 0.99)))
+        return theta
     
     prev_lhd = bnd_calc_log_lhd(theta)
 
@@ -265,7 +255,6 @@ def update_mixture_params_estimate(z1, z2, starting_point,
         # elif gradient[i] < 0:
         #     alpha < -theta[i]/gradient[i]
         max_alpha = 1
-        """
         for param_val, grad_val in zip(theta, grad):
             if grad_val > 1e-6:
                 max_alpha = min(max_alpha, param_val/grad_val)
@@ -283,7 +272,7 @@ def update_mixture_params_estimate(z1, z2, starting_point,
                 max_alpha = min(max_alpha, (1-param_val)/grad_val)
             elif grad_val < -1e-6:
                 max_alpha = min(max_alpha, (param_val-1)/grad_val)
-        """
+        
         alpha = fminbound(bnd_objective, 0, max_alpha)
         log_lhd = -bnd_objective(alpha)
         if abs(log_lhd-prev_lhd) < EPS:
