@@ -147,7 +147,6 @@ def update_mixture_params_estimate_OLD(z1, z2, starting_point):
     mu_1 = (ez*z1).sum()/(ez_sum)
     mu_2 = (ez*z2).sum()/(ez_sum)
     mu = (mu_1 + mu_2)/2
-    mu = 1
     
     weighted_sum_sqs_1 = (ez*((z1-mu)**2)).sum()
     weighted_sum_sqs_2 = (ez*((z2-mu)**2)).sum()
@@ -165,8 +164,8 @@ def update_mixture_params_estimate_OLD(z1, z2, starting_point):
 
 def update_mixture_params_estimate(z1, z2, starting_point):
     mu, sigma, rho, p = starting_point
-    mu = 1
-    sigma = 1
+    mu = mu[0]
+    sigma = sigma[0]
     
     prev_lhd = None
     for i in range(10000):
@@ -178,9 +177,12 @@ def update_mixture_params_estimate(z1, z2, starting_point):
             p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd))
         ez_sum = ez.sum()
 
-        weighted_sum_sqs_1 = (ez*((z1-mu)**2)).sum()
-        weighted_sum_sqs_2 = (ez*((z2-mu)**2)).sum()
-        weighted_sum_prod = (ez*(z2-mu)*(z1-mu)).sum()    
+        std_z1 = (z1-mu)/sigma
+        std_z2 = (z2-mu)/sigma
+        
+        weighted_sum_sqs_1 = (ez*(std_z1**2)).sum()
+        weighted_sum_sqs_2 = (ez*((std_z2)**2)).sum()
+        weighted_sum_prod = (ez*std_z2*std_z1).sum()    
         
         rho_grad = rho*(rho*rho-1)*ez_sum - (rho*rho+1)*weighted_sum_prod +rho*(
             weighted_sum_sqs_1 + weighted_sum_sqs_2)
@@ -190,11 +192,16 @@ def update_mixture_params_estimate(z1, z2, starting_point):
         p_grad /= p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd)
         p_grad = p_grad.sum()
 
-        mu_grad = (ez*(((z1-mu)+(z2-mu))/(1-rho*rho))).sum()
+        mu_grad = (ez*((std_z1+std_z2)/(1-rho*rho))).sum()
+        
+        sigma_grad = weighted_sum_sqs_1 + weighted_sum_sqs_2 - 2*rho*weighted_sum_prod
+        sigma_grad /= (1-rho*rho)
+        sigma_grad -= 2*ez_sum
+        sigma_grad /= sigma
         
         log_lhd = numpy.log(p*numpy.exp(signal_log_lhd)
                             +(1-p)*numpy.exp(noise_log_lhd)).sum()
-        print(log_lhd, mu_grad, sigma, rho_grad, p_grad)
+        print(log_lhd, mu_grad, sigma, sigma_grad, rho_grad, p_grad)
 
         assert prev_lhd == None or log_lhd - prev_lhd + EPS > 0
         if prev_lhd != None and abs(log_lhd-prev_lhd) < EPS and (
@@ -206,7 +213,8 @@ def update_mixture_params_estimate(z1, z2, starting_point):
             rho -= 1e-6*rho_grad
             p += 1e-6*p_grad
             mu += 1e-6*mu_grad
-    
+            sigma += 1e-6*sigma_grad
+        
     assert False
 
 def estimate_mixture_params(r1_values, r2_values, params):
@@ -266,7 +274,7 @@ def main():
             10000, params)
         params = ((1,1), (1,1), 0.1, 0.9)
         print( update_mixture_params_estimate(r1_values, r2_values, params) )
-        #print( estimate_mixture_params(r1_values, r2_values, params) )
+        print( estimate_mixture_params(r1_values, r2_values, params) )
     
     return
     params = (1, 1, 0.9, 0.5)
