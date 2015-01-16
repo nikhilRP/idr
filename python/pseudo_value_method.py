@@ -338,12 +338,12 @@ def update_mixture_params_estimate(z1, z2, starting_point,
     theta = numpy.array((mu[0], sigma[0], rho, p))
 
     def bnd_calc_log_lhd(theta):
-        return calc_log_lhd_new(theta, z1, z2, fix_mu, fix_sigma)
+        return calc_log_lhd(theta, z1, z2, fix_mu, fix_sigma)
 
     def bnd_calc_log_lhd_gradient(theta):
         #print( calc_log_lhd_gradient_new(theta, z1, z2, fix_mu, fix_sigma), 
         #       calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma) )
-        return calc_log_lhd_gradient_new(theta, z1, z2, fix_mu, fix_sigma)
+        return calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
     
     def find_max_step_size(theta):
         # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
