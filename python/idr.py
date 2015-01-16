@@ -244,7 +244,8 @@ def main():
         for pk in merged_peaks: print( pk, file=args.output_file )
         raise ValueError(error_msg)
     
-    em_gaussian(s1, s2, (1, 1, 0.5, 0.5)) # mu, sigma, rho, p
+    em_gaussian(s1, s2, ((0,0), (1,1), 0.8, 0.8), 
+                False, False, False) 
     return
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)

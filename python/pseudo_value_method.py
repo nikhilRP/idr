@@ -13,6 +13,37 @@ MAX_NUM_PSUEDO_VAL_ITER = 10000
 MAX_NUM_EM_ITERS = 1000
 EPS = 1e-6
 
+import sympy
+sympy.init_printing(use_unicode=True)
+
+z1_s, z2_s = sympy.symbols("z1, z2")
+lamda_s, sigma_s = sympy.symbols("lamda, sigma", positive=True, real=True)
+mu_s, rho_s = sympy.symbols("mu, rho", real=True)
+
+std_z1_s = (z1_s - mu_s)/sigma_s
+std_z2_s = (z2_s - mu_s)/sigma_s
+
+sym_biv_density = (
+                   1./(2.*sympy.pi*sigma_s*sigma_s)
+                  )*(
+                   1./sympy.sqrt(1.-rho_s**2)
+                  )*sympy.exp(-(
+                      std_z1_s**2 + std_z2_s**2 - 2*rho_s*std_z1_s*std_z2_s
+                  )/(2*(1-rho_s**2)))
+sym_signal_density = sym_biv_density
+sym_noise_density = sym_biv_density.subs({mu_s:0, rho_s:0, sigma_s:1})
+
+sym_log_lhd = sympy.log(lamda_s*sym_signal_density 
+                        + (1-lamda_s)*sym_noise_density)
+from sympy.utilities.autowrap import ufuncify
+from sympy.printing.theanocode import theano_function
+
+USE_THEANO = True
+USE_LAMBDIFY = False
+USE_uFUNCIFY = False
+
+numpy.random.seed(0)
+
 def simulate_values(N, params):
     mu, sigma, rho, p = params
     signal_sim_values = numpy.random.multivariate_normal(
@@ -224,22 +255,101 @@ def calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma):
     
     return numpy.array((mu_grad, sigma_grad, rho_grad, p_grad))
 
+sym_gradients = []
+for sym in (mu_s, sigma_s, rho_s, lamda_s):
+    deriv_log_lhd_sym = sympy.diff(sym_log_lhd, sym)
+    sym_gradients.append( deriv_log_lhd_sym )
+
+if USE_THEANO:
+    theano_gradient = theano_function(
+        (mu_s, sigma_s, rho_s, lamda_s, z1_s, z2_s), 
+        sym_gradients,
+        dims={mu_s:1, sigma_s:1, rho_s:1, lamda_s:1, z1_s: 1, z2_s:1})    
+
+    theano_log_lhd = theano_function(
+        (mu_s, sigma_s, rho_s, lamda_s, z1_s, z2_s), 
+        [sym_log_lhd,],
+        dims={mu_s:1, sigma_s:1, rho_s:1, lamda_s:1, z1_s: 1, z2_s:1})    
+
+if USE_LAMBDIFY:
+    lambdify_grad_fns = [
+        sympy.lambdify(
+                (mu_s, sigma_s, rho_s, lamda_s, z1_s, z2_s), 
+                deriv_log_lhd_sym, "numpy")
+        for deriv_log_lhd_sym in sym_gradients ]
+
+    lambdify_log_lhd = sympy.lambdify(
+        (mu_s, sigma_s, rho_s, lamda_s, z1_s, z2_s), 
+        sym_log_lhd, "numpy")
+
+if USE_uFUNCIFY:
+    ufuncify_grad_fns = [
+        ufuncify(
+                (mu_s, sigma_s, rho_s, lamda_s, z1_s, z2_s), 
+                deriv_log_lhd_sym)
+        for deriv_log_lhd_sym in sym_gradients ]
+
+    ufuncify_log_lhd = ufuncify(
+        (mu_s, sigma_s, rho_s, lamda_s, z1_s, z2_s), 
+        sym_log_lhd)
+
+
+def calc_log_lhd_gradient_new(theta, z1, z2, fix_mu, fix_sigma):
+    mu, sigma, rho, lamda = theta
+
+    if USE_THEANO:
+        res = theano_gradient(
+            numpy.repeat(mu, len(z1)),
+            numpy.repeat(sigma, len(z1)),
+            numpy.repeat(rho, len(z1)),
+            numpy.repeat(lamda, len(z1)),
+            z1, z2 )
+        return numpy.array( [x.sum() for x in res] )
+    if USE_LAMBDIFY:
+        return numpy.array([grad_fn(mu, sigma, rho, lamda, z1, z2).sum()
+                            for grad_fn in lambdify_grad_fns])
+    if USE_uFUNCIFY:
+        return numpy.array([grad_fn(mu, sigma, rho, lamda, z1, z2).sum()
+                            for grad_fn in ufuncify_grad_fns])        
+    assert False
+
+
+
+def calc_log_lhd_new(theta, z1, z2, fix_mu, fix_sigma):
+    mu, sigma, rho, lamda = theta
+    if USE_THEANO:
+        return theano_log_lhd(
+            numpy.repeat(mu, len(z1)),
+            numpy.repeat(sigma, len(z1)),
+            numpy.repeat(rho, len(z1)),
+            numpy.repeat(lamda, len(z1)),
+            z1, z2 ).sum()
+    if USE_LAMBDIFY:
+        return lambdify_log_lhd( mu, sigma, rho, lamda, z1, z2 ).sum()
+    if USE_uFUNCIFY:
+        return ufuncify_log_lhd( mu, sigma, rho, lamda, z1, z2 ).sum()
+    assert False
+
+
 def update_mixture_params_estimate(z1, z2, starting_point, 
                                    fix_mu=False, fix_sigma=False ):
     mu, sigma, rho, p = starting_point
+
     theta = numpy.array((mu[0], sigma[0], rho, p))
 
     def bnd_calc_log_lhd(theta):
-        return calc_log_lhd(theta, z1, z2)
+        return calc_log_lhd_new(theta, z1, z2, fix_mu, fix_sigma)
 
     def bnd_calc_log_lhd_gradient(theta):
-        return calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
+        #print( calc_log_lhd_gradient_new(theta, z1, z2, fix_mu, fix_sigma), 
+        #       calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma) )
+        return calc_log_lhd_gradient_new(theta, z1, z2, fix_mu, fix_sigma)
     
     def find_max_step_size(theta):
         # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
         grad = bnd_calc_log_lhd_gradient(theta)
         ## everything is greater than 0 constraint
-        # theta[i] + gradient[i]*alpha > 0
+        # theta[i] + gradient[i]*alpha >>>> f = ufuncify([x], expr) 0
         # gradient[i]*alpha > -theta[i]
         # if gradient[i] > 0:
         #     alpha < theta[i]/gradient[i]
@@ -275,6 +385,7 @@ def update_mixture_params_estimate(z1, z2, starting_point,
             return -bnd_calc_log_lhd( new_theta )
                 
         alpha = fminbound(bnd_objective, 0, find_max_step_size(theta))
+        #alpha = min(1e-6, find_max_step_size(theta))
         log_lhd = -bnd_objective(alpha)
         if abs(log_lhd-prev_lhd) < EPS:
             return ( ((theta[0], theta[0]), 
@@ -284,6 +395,35 @@ def update_mixture_params_estimate(z1, z2, starting_point,
         else:
             prev_lhd = log_lhd
             theta += alpha*bnd_calc_log_lhd_gradient(theta)
+            print( log_lhd, theta )
+    
+    assert False
+
+def update_mixture_params_estimate_STD(z1, z2, starting_point, 
+                                   fix_mu=False, fix_sigma=False ):
+    mu, sigma, rho, p = starting_point
+    theta = numpy.array((mu[0], sigma[0], rho, p))
+
+    def bnd_calc_log_lhd(theta):
+        print( theta )
+        return -calc_log_lhd(theta, z1, z2)
+
+    def bnd_calc_log_lhd_gradient(theta):
+        return -calc_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma)
+    
+    prev_lhd = bnd_calc_log_lhd(theta)
+
+    from scipy.optimize import minimize
+    cons = [(0, 100), (0.10, 10), (0.05, 0.95), (0.05, 0.95)]
+    res = minimize(bnd_calc_log_lhd, 
+                   theta, 
+                   method='TNC',
+                   bounds=cons,
+                   jac=bnd_calc_log_lhd_gradient,
+                   tol=1e-3,
+                   options={'maxiter': 10000})
+                     #maxfun=100000)
+    print( res )
         
     assert False
 
@@ -328,6 +468,7 @@ def em_gaussian(ranks_1, ranks_2, params,
             params, log_lhd = update_mixture_params_estimate(
                 z1, z2, params, fix_mu, fix_sigma)
 
+        print( i, log_lhd, params )
         lhds.append(log_lhd)
         param_path.append(params)
 
@@ -341,17 +482,15 @@ def em_gaussian(ranks_1, ranks_2, params,
 
 def main():
     #params = (mu, sigma, rho, p)
-    """
     for i in range(1):
         params = (1, 1, 0.9, 0.5)
         (r1_ranks, r2_ranks), (r1_values, r2_values) = simulate_values(
             10000, params)
         params = ((1,1), (1,1), 0.1, 0.9)
-        print( update_mixture_params_estimate(r1_values, r2_values, params) )
+        print(update_mixture_params_estimate(r1_values, r2_values, params))
         print( estimate_mixture_params(r1_values, r2_values, params) )
     
     return
-    """
     params = (1, 1, 0.9, 0.5)
     (r1_ranks, r2_ranks), (r1_values, r2_values) = simulate_values(10000, params)
     import pylab
