@@ -30,6 +30,7 @@ try:
     import pyximport; pyximport.install()
     from inv_cdf import cdf, cdf_i
 except ImportError:
+    print( "WARNING: Cython does not appear to be installed - falling back to much slower python method." )
     def cdf(x, mu, sigma, pi):
         norm_x = (x-mu)/sigma
         return 0.5*( pi*erf(0.707106781186547461715*norm_x) 

@@ -19,8 +19,13 @@ QUIET = False
 
 IGNORE_NONOVERLAPPING_PEAKS = False
 
-MAX_NUM_ITER = 1000
-EPS = 1e-4
+MAX_ITER_DEFAULT = 1000
+CONVERGENCE_EPS_DEFAULT = 1e-10
+
+DEFAULT_MU = 2.0
+DEFAULT_SIGMA = 0.8
+DEFAULT_RHO = 0.6
+DEFAULT_MIX_PARAM = 0.5
 
 import optimization
 from optimization import estimate_model_params, old_estimator
@@ -160,6 +165,36 @@ def calc_IDR(theta, r1, r2):
 
     return localIDR, IDR[local_idr_order]
 
+def fit_model_and_calc_idr(r1, r2, 
+                           starting_point=None,
+                           max_iter=MAX_ITER_DEFAULT, 
+                           convergence_eps=CONVERGENCE_EPS_DEFAULT, 
+                           fix_mu=False, fix_sigma=False ):
+    # in theory we would try to find good starting point here,
+    # but for now just set it to somethign reasonable
+    if starting_point == None:
+        starting_point = (DEFAULT_MU, DEFAULT_SIGMA, 
+                          DEFAULT_RHO, DEFAULT_MIX_PARAM)
+    
+    log("Initial parameter values: [%s]" % " ".join(
+        "%.2f" % x for x in starting_point))
+    
+    # fit the model parameters    
+    log("Fitting the model parameters", 'VERBOSE');
+    theta, loss = estimate_model_params(r1, r2, 
+                                        starting_point, 
+                                        max_iter=max_iter, 
+                                        convergence_eps=convergence_eps,
+                                        fix_mu=fix_mu, fix_sigma=fix_sigma)
+    
+    log("Finished running IDR on the datasets", 'VERBOSE')
+    log("Final parameter values: %s" % " ".join("%.2f" % x for x in theta))
+    
+    # calculate the global IDR
+    localIDRs, IDRs = calc_IDR(numpy.array(theta), r1, r2)
+
+    return localIDRs, IDRs
+
 
 def parse_args():
     import argparse
@@ -193,12 +228,39 @@ Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>
     
     parser.add_argument( '--use-nonoverlapping-peaks', 
                          action="store_true", default=False,
-        help='Use peaks without an overlapping match, setting the value to 0 for signal and 1 for p/qvalue.')
+        help='Use peaks without an overlapping match and set the value to 0.')
     
     parser.add_argument( '--peak-merge-method', 
                          choices=["sum", "avg", "min", "max"], default=None,
-        help="Which method to use for merging peaks. Default: 'mean' for signal, 'min' for p/q-value.")
-    
+        help="Which method to use for merging peaks.\n" \
+              + "\tDefault: 'mean' for signal, 'min' for p/q-value.")
+
+    parser.add_argument( '--fix-mu', action='store_true', 
+        help="Fix mu to the starting point and do not let it vary.")    
+    parser.add_argument( '--fix-sigma', action='store_true', 
+        help="Fix sigma to the starting point and do not let it vary.")    
+
+    parser.add_argument( '--initial-mu', type=float, default=DEFAULT_MU,
+        help="Initial value of mu. Default: %.2f" % DEFAULT_MU)
+    parser.add_argument( '--initial-sigma', type=float, default=DEFAULT_SIGMA,
+        help="Initial value of sigma. Default: %.2f" % DEFAULT_SIGMA)
+    parser.add_argument( '--initial-rho', type=float, default=DEFAULT_RHO,
+        help="Initial value of rho. Default: %.2f" % DEFAULT_RHO)
+    parser.add_argument( '--initial-mix-param', 
+        type=float, default=DEFAULT_MIX_PARAM,
+        help="Initial value of the mixture params. Default: %.2f" \
+                         % DEFAULT_MIX_PARAM)
+
+
+    parser.add_argument( '--max-iter', type=int, default=5000, 
+        help="The maximum number of optimization iterations.")
+    parser.add_argument( '--convergence-eps', type=float, default=1e-10, 
+        help="The maximum change in parameter value changes for convergence.")
+
+    parser.add_argument( '--only-merge-peaks', action='store_true', 
+        help="Only return the merged peak list.")    
+
+
     parser.add_argument( '--verbose', action="store_true", default=False, 
                          help="Print out additional debug information")
     parser.add_argument( '--quiet', action="store_true", default=False, 
@@ -249,30 +311,25 @@ def main():
     
     # build the ranks vector
     log("Ranking peaks", 'VERBOSE')
-    s1, s2 = build_rank_vectors(merged_peaks)
+    r1, r2 = build_rank_vectors(merged_peaks)
     
-    #with open("test_data2.txt", "w") as ofp:
-    #    for x, y in zip(s1, s2):
-    #        ofp.write("%e\t%e\n" % (x, y))
-    #return
     if( len(merged_peaks) < 20 ):
         error_msg = "Peak files must contain at least 20 peaks post-merge"
         error_msg += "\nHint: Merged peaks were written to the output file"
         for pk in merged_peaks: print( pk, file=args.output_file )
         raise ValueError(error_msg)
 
+
+    initial_param_values = (
+        args.initial_mu, args.initial_sigma, 
+        args.initial_rho, args.initial_mix_param)
     
-    # fit the model parameters    
-    log("Fitting the model parameters", 'VERBOSE');
-    theta, loss = estimate_model_params(s1, s2, (1, 1, 0.8, 0.8), 
-                                        N=10000, EPS=1e-12,
-                                        fix_mu=False, fix_sigma=False)
-    
-    log("Finished running IDR on the datasets")
-    log("Final parameter values: %s" % " ".join("%.2e"%x for x in theta))
-    
-    # calculate the global IDR
-    localIDRs, IDRs = calc_IDR(numpy.array(theta), s1, s2)
+    localIDRs, IDRs = fit_model_and_calc_idr(
+        r1, r2, 
+        starting_point=initial_param_values,
+        max_iter=args.max_iter, 
+        convergence_eps=args.convergence_eps,
+        fix_mu=args.fix_mu, fix_sigma=args.fix_sigma )    
     
     # write out the result
     log("Writing results to file", "VERBOSE");

@@ -333,12 +333,14 @@ def EMP_with_pseudo_value_algorithm(
 
 
 def estimate_model_params(
-        r1, r2, theta_0, N=100, EPS=1e-4, 
+        r1, r2, 
+        theta_0, 
+        max_iter=5000, convergence_eps=1e-10, 
         fix_mu=False, fix_sigma=False):
 
     theta, loss = EMP_with_pseudo_value_algorithm(
-        r1, r2, theta_0, N=N, EPS=EPS, 
-        fix_mu=False, fix_sigma=False)
+        r1, r2, theta_0, N=max_iter, EPS=convergence_eps, 
+        fix_mu=fix_mu, fix_sigma=fix_sigma)
     
     return theta, loss
 
