@@ -2,8 +2,9 @@ import os, sys
 
 import math
 
-
 import numpy
+
+from scipy.stats.stats import rankdata
 
 def mean(items):
     items = list(items)
@@ -21,36 +22,9 @@ IGNORE_NONOVERLAPPING_PEAKS = False
 MAX_NUM_ITER = 1000
 EPS = 1e-4
 
-from pseudo_value_method import take_EM_steps, estimate_model_params
-
-def pseudo_value_estimator(ranks_1, ranks_2, fix_mu=True, fix_sigma=True):
-    pass
-
-
-def old_estimator(ranks_1, ranks_2):
-    import ctypes
-    
-    class c_OptimizationRV(ctypes.Structure):
-        _fields_ = [("n_iters", ctypes.c_int), 
-                    ("rho", ctypes.c_double), 
-                    ("p", ctypes.c_double)]
-
-    C_em_gaussian = ctypes.cdll.LoadLibrary(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                     "IDR_parameter_estimation.so")).em_gaussian
-    C_em_gaussian.restype = c_OptimizationRV
-    
-    n = len(ranks_1)
-    assert( n == len(ranks_1) == len(ranks_2) )
-    localIDR = numpy.zeros(n, dtype='d')
-    rv = C_em_gaussian(
-        ctypes.c_int(n), 
-        ranks_1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        ranks_2.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
-        localIDR.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        (ctypes.c_int(1) if VERBOSE else ctypes.c_int(0)) )
-    
-    return( 0.0, 1.0, float(rv.rho), float(rv.p) )
+import optimization
+from optimization import estimate_model_params, old_estimator
+from utility import calc_post_membership_prbs, compute_pseudo_values
 
 
 def load_bed(fp, signal_type):
@@ -159,11 +133,33 @@ def build_idr_output_line(
         
     return "\t".join(rv)
 
-def fit_model_params(r1, r2, 
-                     fix_mu=True,
-                     fix_sigma=True,
-                     method="pseudo_value"):
-    pass
+def calc_IDR(theta, r1, r2):
+    """
+    idr <- 1 - e.z
+    o <- order(idr)
+    idr.o <- idr[o]
+    idr.rank <- rank(idr.o, ties.method = "max")
+    top.mean <- function(index, x) {
+        mean(x[1:index])
+    }
+    IDR.o <- sapply(idr.rank, top.mean, idr.o)
+    IDR <- idr
+    IDR[o] <- IDR.o
+    """
+    mu, sigma, rho, p = theta
+    z1 = compute_pseudo_values(r1, mu, sigma, p)
+    z2 = compute_pseudo_values(r2, mu, sigma, p)
+    localIDR = 1 - calc_post_membership_prbs(numpy.array(theta), z1, z2)
+    local_idr_order = localIDR.argsort()
+    ordered_local_idr = localIDR[local_idr_order]
+    ordered_local_idr_ranks = rankdata( ordered_local_idr, method='max' )
+    IDR = []
+    for rank in ordered_local_idr_ranks:
+        IDR.append(ordered_local_idr[:rank].mean())
+    IDR = numpy.array(IDR)
+
+    return localIDR, IDR[local_idr_order]
+
 
 def parse_args():
     import argparse
@@ -211,12 +207,15 @@ Contact: Nikhil R Podduturi <nikhilrp@stanford.edu>
     args = parser.parse_args()
 
     global VERBOSE
-    if args.verbose: VERBOSE = True 
+    if args.verbose: 
+        VERBOSE = True 
 
     global QUIET
     if args.quiet: 
         QUIET = True 
         VERBOSE = False
+    
+    optimization.VERBOSE = VERBOSE
 
     global IGNORE_NONOVERLAPPING_PEAKS
     IGNORE_NONOVERLAPPING_PEAKS = not args.use_nonoverlapping_peaks
@@ -240,16 +239,16 @@ def main():
     args, peak_merge_fn = parse_args()
     
     # load the peak files
-    log("Loading the peak files", 'VERBOSE');
+    log("Loading the peak files", 'VERBOSE')
     f1 = load_bed(args.a, args.rank)
     f2 = load_bed(args.b, args.rank)
 
     # build a unified peak set
-    log("Merging peaks", 'VERBOSE');
+    log("Merging peaks", 'VERBOSE')
     merged_peaks = merge_peaks(f1, f2, peak_merge_fn)
     
     # build the ranks vector
-    log("Ranking peaks", 'VERBOSE');
+    log("Ranking peaks", 'VERBOSE')
     s1, s2 = build_rank_vectors(merged_peaks)
     
     #with open("test_data2.txt", "w") as ofp:
@@ -262,40 +261,26 @@ def main():
         for pk in merged_peaks: print( pk, file=args.output_file )
         raise ValueError(error_msg)
 
-    #print( estimate_model_params(s1, s2, (1, 1, 0.8, 0.8), 
-    #                             fix_mu=False, fix_sigma=False)  )
-
-    print( old_estimator(s1, s2) )
-    
-    #theta, log_lhd =  take_EM_steps(s1, s2, (1, 1, 0.50, 0.50), 
-    #                                N=1000, fix_mu=True, fix_sigma=True) 
-    
-    return
     
     # fit the model parameters    
-    # (e.g. call the local idr C estimation code)
     log("Fitting the model parameters", 'VERBOSE');
-    (n_iter, rho, p), IDRs = em_gaussian(s1, s2)
+    theta, loss = estimate_model_params(s1, s2, (1, 1, 0.8, 0.8), 
+                                        N=10000, EPS=1e-12,
+                                        fix_mu=False, fix_sigma=False)
     
-    log("Finished running IDR on the datasets");
-    log("Final P value = %.15f" % p);
-    log("Final rho value = %.15f" % rho);
-    log("Total iterations of EM - %i" % n_iter);
+    log("Finished running IDR on the datasets")
+    log("Final parameter values: %s" % " ".join("%.2e"%x for x in theta))
     
-    # build the global IDR array
-    log("Building the global IDR array", 'VERBOSE');
-    merged_data = sorted(zip(IDRs, merged_peaks))
-    localIDRs = [merged_data[0][0],]
-    for i, (IDR, merged_peak) in enumerate(merged_data[1:]):
-        localIDRs.append( (IDR + localIDRs[i])/(i+2) )
+    # calculate the global IDR
+    localIDRs, IDRs = calc_IDR(numpy.array(theta), s1, s2)
     
-    # write out the ouput
+    # write out the result
     log("Writing results to file", "VERBOSE");
     num_peaks_passing_thresh = 0
-    for localIDR, (IDR, merged_peak) in zip(
-            localIDRs, merged_data):
+    for localIDR, IDR, merged_peak in zip(
+            localIDRs, IDRs, merged_peaks):
         # skip peaks with global idr values below the threshold
-        if IDR > args.idr: continue
+        #if IDR > args.idr: continue
         num_peaks_passing_thresh += 1
         opline = build_idr_output_line(
             merged_peak[0], merged_peak[1], 

@@ -1,8 +1,9 @@
-
 import numpy
 
 from scipy.special import erf
 from scipy.optimize import brentq
+
+import math
 
 def simulate_values(N, params):
     """Simulate ranks and values from a mixture of gaussians
@@ -58,11 +59,23 @@ def calc_gaussian_lhd(mu_1, mu_2, sigma_1, sigma_2, rho, z1, z2):
     )
     return loglik
 
+def calc_post_membership_prbs(theta, z1, z2):
+    mu, sigma, rho, p = theta
+    
+    noise_log_lhd = calc_gaussian_lhd(0,0, 1,1, 0, z1, z2)
+    signal_log_lhd = calc_gaussian_lhd(
+        mu, mu, sigma, sigma, rho, z1, z2)
+    
+    ez = p*numpy.exp(signal_log_lhd)/(
+        p*numpy.exp(signal_log_lhd)+(1-p)*numpy.exp(noise_log_lhd))
+    
+    return ez
+
 def calc_gaussian_mix_log_lhd(theta, z1, z2):
     mu, sigma, rho, p = theta
 
-    noise_log_lhd = compute_lhd(0,0, 1,1, 0, z1, z2)
-    signal_log_lhd = compute_lhd(
+    noise_log_lhd = calc_gaussian_lhd(0,0, 1,1, 0, z1, z2)
+    signal_log_lhd = calc_gaussian_lhd(
         mu, mu, sigma, sigma, rho, z1, z2)
 
     log_lhd = numpy.log(p*numpy.exp(signal_log_lhd)
@@ -72,8 +85,8 @@ def calc_gaussian_mix_log_lhd(theta, z1, z2):
 def calc_gaussian_mix_log_lhd_gradient(theta, z1, z2, fix_mu, fix_sigma):
     mu, sigma, rho, p = theta
 
-    noise_log_lhd = compute_lhd(0,0, 1,1, 0, z1, z2)
-    signal_log_lhd = compute_lhd(
+    noise_log_lhd = calc_gaussian_lhd(0,0, 1,1, 0, z1, z2)
+    signal_log_lhd = calc_gaussian_lhd(
         mu, mu, sigma, sigma, rho, z1, z2)
 
     # calculate the likelihood ratio for each statistic
