@@ -195,6 +195,38 @@ def fit_model_and_calc_idr(r1, r2,
 
     return localIDRs, IDRs
 
+def write_results_to_file(merged_peaks, output_file, 
+                          max_allowed_idr=1.0,
+                          localIDRs=None, IDRs=None):
+    # write out the result
+    log("Writing results to file", "VERBOSE");
+    
+    if localIDRs == None or IDRs == None:
+        assert IDRs == None
+        assert localIDRs == None
+        localIDRs = numpy.ones(len(merged_peaks))
+        IDRs = numpy.ones(len(merged_peaks))
+
+    
+    num_peaks_passing_thresh = 0
+    for localIDR, IDR, merged_peak in zip(
+            localIDRs, IDRs, merged_peaks):
+        # skip peaks with global idr values below the threshold
+        if IDR > max_allowed_idr: continue
+        num_peaks_passing_thresh += 1
+        opline = build_idr_output_line(
+            merged_peak[0], merged_peak[1], 
+            merged_peak[4:6], 
+            merged_peak[6], IDR, localIDR )
+        print( opline, file=output_file )
+
+    log("Number of peaks passing IDR cutoff of {} - {}/{} ({:.1f}%)\n".format(
+        max_allowed_idr, 
+        num_peaks_passing_thresh, len(merged_peaks),
+        100*float(num_peaks_passing_thresh)/len(merged_peaks))
+    )
+    
+    return 
 
 def parse_args():
     import argparse
@@ -313,40 +345,30 @@ def main():
     log("Ranking peaks", 'VERBOSE')
     r1, r2 = build_rank_vectors(merged_peaks)
     
-    if( len(merged_peaks) < 20 ):
-        error_msg = "Peak files must contain at least 20 peaks post-merge"
-        error_msg += "\nHint: Merged peaks were written to the output file"
-        for pk in merged_peaks: print( pk, file=args.output_file )
-        raise ValueError(error_msg)
+    if args.only_merge_peaks:
+        localIDRs, IDRs = None, None
+    else:
+        if len(merged_peaks) < 20:
+            error_msg = "Peak files must contain at least 20 peaks post-merge"
+            error_msg += "\nHint: Merged peaks were written to the output file"
+            write_results_to_file(
+                merged_peaks, args.output_file )
+            raise ValueError(error_msg)
 
-
-    initial_param_values = (
-        args.initial_mu, args.initial_sigma, 
-        args.initial_rho, args.initial_mix_param)
+        localIDRs, IDRs = fit_model_and_calc_idr(
+            r1, r2, 
+            starting_point=(
+                args.initial_mu, args.initial_sigma, 
+                args.initial_rho, args.initial_mix_param),
+            max_iter=args.max_iter,
+            convergence_eps=args.convergence_eps,
+            fix_mu=args.fix_mu, fix_sigma=args.fix_sigma )    
     
-    localIDRs, IDRs = fit_model_and_calc_idr(
-        r1, r2, 
-        starting_point=initial_param_values,
-        max_iter=args.max_iter, 
-        convergence_eps=args.convergence_eps,
-        fix_mu=args.fix_mu, fix_sigma=args.fix_sigma )    
-    
-    # write out the result
-    log("Writing results to file", "VERBOSE");
-    num_peaks_passing_thresh = 0
-    for localIDR, IDR, merged_peak in zip(
-            localIDRs, IDRs, merged_peaks):
-        # skip peaks with global idr values below the threshold
-        #if IDR > args.idr: continue
-        num_peaks_passing_thresh += 1
-        opline = build_idr_output_line(
-            merged_peak[0], merged_peak[1], 
-            merged_peak[4:6], 
-            merged_peak[6], IDR, localIDR )
-        print( opline, file=args.output_file )
+    write_results_to_file(merged_peaks, 
+                          args.output_file, 
+                          max_allowed_idr=args.idr,
+                          localIDRs=localIDRs, IDRs=IDRs)
 
-    log("Number of peaks passing IDR cutoff of {} - {}\n".format(
-            args.idr, num_peaks_passing_thresh))
     args.output_file.close()
 
 if __name__ == '__main__':
