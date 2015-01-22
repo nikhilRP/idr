@@ -387,3 +387,334 @@ def test_timing():
 
     def t2():
         return compute_pseudo_values(r1_ranks, 1, 1, 0.5)
+
+def update_mixture_params_estimate_BAD(r1, r2, starting_point, 
+                                   fix_mu=False, fix_sigma=False ):
+    mu, sigma, rho, p = starting_point
+
+    theta = numpy.array((mu[0], sigma[0], rho, p))
+
+    def bnd_calc_log_lhd(theta):
+        mu, sigma, rho, p = theta
+        z1 = GMCDF_i(r1, mu, sigma, p)
+        z2 = GMCDF_i(r2, mu, sigma, p)
+        rv = calc_log_lhd_new(theta, z1, z2)
+        return rv
+
+    def bnd_calc_log_lhd_gradient(theta):
+        z1 = GMCDF_i(r1, mu[0], sigma[0], p)
+        z2 = GMCDF_i(r2, mu[1], sigma[1], p)
+        return calc_log_lhd_gradient_new(
+            theta, z1, z2, fix_mu, fix_sigma)
+    
+    def find_max_step_size(theta, grad):
+        # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
+
+        ## everything is greater than 0 constraint
+        # theta[i] + gradient[i]*alpha >>>> f = ufuncify([x], expr) 0
+        # gradient[i]*alpha > -theta[i]
+        # if gradient[i] > 0:
+        #     alpha < theta[i]/gradient[i]
+        # elif gradient[i] < 0:
+        #     alpha < -theta[i]/gradient[i]
+        max_alpha = 10000
+        for param_val, grad_val in zip(theta, grad):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, param_val/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, -param_val/grad_val)
+        
+        ## correlation and mix param are less than 1 constraint
+        # theta[3] + gradient[3]*alpha < 1
+        # gradient[3]*alpha < 1 - theta[3]
+        # if gradient[2] > 0:
+        #     alpha < (1 - theta[3])/gradient[3]
+        # elif gradient[2] < 0:
+        #     alpha < (theta[3] - 1)/gradient[3]
+        for param_val, grad_val in zip(theta[2:], grad[2:]):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, (1-param_val)/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, (param_val-1)/grad_val)
+        
+        return max_alpha
+    
+    prev_lhd = bnd_calc_log_lhd(theta)
+
+    inactive_set = []
+    inactive_alphas = []
+    for i in range(10000):
+        gradient = bnd_calc_log_lhd_gradient(theta)
+        for index in inactive_set:
+            gradient[index] = 0
+        gradient[ numpy.abs(gradient) != numpy.abs(gradient).max() ] = 0
+        #print( numpy.argmax(numpy.abs(gradient)) )
+        current_index = numpy.argmax(numpy.abs(gradient)) 
+        
+        norm_gradient = gradient/numpy.abs(gradient).sum()
+        max_step_size = find_max_step_size(theta, norm_gradient)
+        
+        def bnd_objective(alpha):
+            new_theta = theta + alpha*norm_gradient
+            rv = -bnd_calc_log_lhd( new_theta )
+            return rv
+                
+        alpha = fminbound(bnd_objective, 0, max_step_size)
+        #alpha = min(1e-2, find_max_step_size(theta))
+        log_lhd = -bnd_objective(alpha)
+        
+        if log_lhd <= prev_lhd:
+            inactive_set.append( current_index )
+            inactive_alphas.append( alpha )
+            if len( inactive_set ) < 4:
+                continue
+        else:
+            theta += alpha*norm_gradient
+            prev_lhd = log_lhd
+
+        if len( inactive_set ) == 4:
+            print( inactive_set )
+            print( inactive_alphas )
+            inactive_set, inactive_alphas = [], []
+        
+        print( log_lhd, log_lhd-prev_lhd, alpha, max_step_size, current_index )
+        print( "gradient", bnd_calc_log_lhd_gradient(theta  + alpha*norm_gradient ) )
+        print( "params", theta + alpha*norm_gradient )
+        print( "="*20 )
+
+        
+        if False and abs(log_lhd-prev_lhd) < 10*EPS:            
+                return ( theta, log_lhd )
+    
+    assert False
+
+def update_mixture_params_estimate_BAD2(r1, r2, starting_point, 
+                                        fix_mu=False, fix_sigma=False ):
+    mu, sigma, rho, p = starting_point
+
+    theta = numpy.array((mu[0], sigma[0], rho, p))
+
+    def bnd_calc_loss(theta):
+        mu, sigma, rho, p = theta
+        z1 = GMCDF_i(r1, mu, sigma, p)
+        z2 = GMCDF_i(r2, mu, sigma, p)
+        rv = calc_loss(theta, z1, z2)
+        return rv
+
+    def bnd_calc_grad(theta):
+        z1 = GMCDF_i(r1, mu[0], sigma[0], p)
+        z2 = GMCDF_i(r2, mu[1], sigma[1], p)
+        rv = calc_grad(
+            theta, z1, z2, fix_mu, fix_sigma)
+        return rv
+    
+    def find_max_step_size(theta, grad):
+        # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
+
+        ## everything is greater than 0 constraint
+        # theta[i] + gradient[i]*alpha >>>> f = ufuncify([x], expr) 0
+        # gradient[i]*alpha > -theta[i]
+        # if gradient[i] > 0:
+        #     alpha < theta[i]/gradient[i]
+        # elif gradient[i] < 0:
+        #     alpha < -theta[i]/gradient[i]
+        max_alpha = 100
+        for param_val, grad_val in zip(theta, grad):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, param_val/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, -param_val/grad_val)
+        
+        ## correlation and mix param are less than 1 constraint
+        # theta[3] + gradient[3]*alpha < 1
+        # gradient[3]*alpha < 1 - theta[3]
+        # if gradient[2] > 0:
+        #     alpha < (1 - theta[3])/gradient[3]
+        # elif gradient[2] < 0:
+        #     alpha < (theta[3] - 1)/gradient[3]
+        for param_val, grad_val in zip(theta[2:], grad[2:]):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, (1-param_val)/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, (param_val-1)/grad_val)
+        
+        return max_alpha
+    
+    prev_lhd = bnd_calc_loss(theta)
+
+    for i in range(10000):
+        for j in range(len(theta)):
+            gradient = bnd_calc_grad(theta)
+            gradient[j] = 0.0
+            #for k in xrange(len(theta)):
+            #    if k != j: gradient[j] = 0.0
+            norm_gradient = gradient/(100*numpy.abs(gradient).sum())
+
+            max_step_size = find_max_step_size(theta, norm_gradient)
+
+            def bnd_objective(alpha):
+                new_theta = theta - alpha*norm_gradient
+                rv = bnd_calc_log_lhd( new_theta )
+                return rv
+
+            alpha = fminbound(bnd_objective, -1e-6, max_step_size)
+            #alpha = min(1e-2, find_max_step_size(theta))
+            log_lhd = bnd_objective(alpha)
+
+            if False and abs(log_lhd-prev_lhd) < 10*EPS:            
+                return theta
+            else:
+                theta -= alpha*norm_gradient
+                prev_lhd = log_lhd
+
+            print( log_lhd, log_lhd-prev_lhd, alpha, max_step_size )
+            print( "gradient", gradient )
+            print( "params", theta )
+            
+            
+            
+            print( "="*20 )
+
+            
+
+            if False and abs(log_lhd-prev_lhd) < 10*EPS:            
+                    return ( theta, log_lhd )
+    
+    assert False
+
+def em_gaussian(ranks_1, ranks_2, params, 
+                use_EM=False, fix_mu=False, fix_sigma=False):
+    lhds = []
+    param_path = []
+    prev_lhd = None
+    for i in range(MAX_NUM_PSUEDO_VAL_ITER):
+        mu, sigma, rho, p = params
+
+        z1 = compute_pseudo_values(ranks_1, mu[0], sigma[0], p)
+        z2 = compute_pseudo_values(ranks_2, mu[1], sigma[1], p)
+
+        if use_EM:
+            params, log_lhd = update_mixture_params_estimate_full(
+                z1, z2, params)
+        else:
+            params, log_lhd = update_mixture_params_archive(
+                z1, z2, params) #, fix_mu, fix_sigma)
+        
+        print( i, log_lhd, params )
+        lhds.append(log_lhd)
+        param_path.append(params)
+
+        #print( i, end=" ", flush=True) # params, log_lhd
+        if prev_lhd != None and abs(log_lhd - prev_lhd) < 1e-4:
+            return params, log_lhd
+        prev_lhd = log_lhd
+
+    raise RuntimeError( "Max num iterations exceeded in pseudo val procedure" )
+
+
+def update_mixture_params_archive(z1, z2, starting_point, 
+                                  fix_mu=False, fix_sigma=False ):
+    mu, sigma, rho, p = starting_point
+
+    theta = numpy.array((mu[0], sigma[0], rho, p))
+
+    def bnd_calc_log_lhd(theta):
+        return calc_log_lhd(theta, z1, z2)
+
+    def bnd_calc_log_lhd_gradient(theta):
+        return calc_log_lhd_gradient(
+            theta, z1, z2, fix_mu, fix_sigma)
+    
+    def find_max_step_size(theta):
+        # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
+        grad = bnd_calc_log_lhd_gradient(theta)
+        ## everything is greater than 0 constraint
+        # theta[i] + gradient[i]*alpha >>>> f = ufuncify([x], expr) 0
+        # gradient[i]*alpha > -theta[i]
+        # if gradient[i] > 0:
+        #     alpha < theta[i]/gradient[i]
+        # elif gradient[i] < 0:
+        #     alpha < -theta[i]/gradient[i]
+        max_alpha = 1
+        for param_val, grad_val in zip(theta, grad):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, param_val/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, -param_val/grad_val)
+        
+        ## correlation and mix param are less than 1 constraint
+        # theta[3] + gradient[3]*alpha < 1
+        # gradient[3]*alpha < 1 - theta[3]
+        # if gradient[2] > 0:
+        #     alpha < (1 - theta[3])/gradient[3]
+        # elif gradient[2] < 0:
+        #     alpha < (theta[3] - 1)/gradient[3]
+        for param_val, grad_val in zip(theta[2:], grad[2:]):
+            if grad_val > 1e-6:
+                max_alpha = min(max_alpha, (1-param_val)/grad_val)
+            elif grad_val < -1e-6:
+                max_alpha = min(max_alpha, (param_val-1)/grad_val)
+        
+        return max_alpha
+    
+    prev_lhd = bnd_calc_log_lhd(theta)
+
+    for i in range(10000):
+        gradient = bnd_calc_log_lhd_gradient(theta)
+        #gradient = gradient/numpy.abs(gradient).sum()
+        #print( gradient )
+        def bnd_objective(alpha):
+            new_theta = theta + alpha*gradient
+            return -bnd_calc_log_lhd( new_theta )
+                
+        alpha = fminbound(bnd_objective, 0, find_max_step_size(theta))
+        log_lhd = -bnd_objective(alpha)
+        
+        #alpha = min(1e-11, find_max_step_size(theta))
+        #while alpha > 0 and log_lhd < prev_lhd:
+        #    alpha /= 10
+        #    log_lhd = -bnd_objective(alpha)
+        
+        if abs(log_lhd-prev_lhd) < EPS:
+            return ( ((theta[0], theta[0]), 
+                      (theta[1], theta[1]), 
+                      theta[2], theta[3]), 
+                     log_lhd )
+        else:
+            theta += alpha*gradient
+            #print( "\t", log_lhd, prev_lhd, theta )
+            prev_lhd = log_lhd
+    
+    assert False
+
+def full_find_max_step_size(theta, grad):
+    # contraints: 0<p<1, 0<rho, 0<sigma, 0<mu
+
+    ## everything is greater than 0 constraint
+    # theta[i] + gradient[i]*alpha >>>> f = ufuncify([x], expr) 0
+    # gradient[i]*alpha > -theta[i]
+    # if gradient[i] > 0:
+    #     alpha < theta[i]/gradient[i]
+    # elif gradient[i] < 0:
+    #     alpha < -theta[i]/gradient[i]
+    max_alpha = 1
+    for param_val, grad_val in zip(theta, grad):
+        if grad_val > 1e-6:
+            max_alpha = min(max_alpha, param_val/grad_val)
+        elif grad_val < -1e-6:
+            max_alpha = min(max_alpha, -param_val/grad_val)
+
+    ## correlation and mix param are less than 1 constraint
+    # theta[3] + gradient[3]*alpha < 1
+    # gradient[3]*alpha < 1 - theta[3]
+    # if gradient[2] > 0:
+    #     alpha < (1 - theta[3])/gradient[3]
+    # elif gradient[2] < 0:
+    #     alpha < (theta[3] - 1)/gradient[3]
+    for param_val, grad_val in zip(theta[2:], grad[2:]):
+        if grad_val > 1e-6:
+            max_alpha = min(max_alpha, (1-param_val)/grad_val)
+        elif grad_val < -1e-6:
+            max_alpha = min(max_alpha, (param_val-1)/grad_val)
+
+    return max_alpha

@@ -343,7 +343,7 @@ def build_copula_mixture_loss_and_grad():
 
         @classmethod
         def eval(cls, x, mu, sigma, lamda):
-            return lamda*GaussianPDF(x, 0, 1) + (1-lamda)*GaussianPDF(x, mu, sigma)
+            return (1-lamda)*GaussianPDF(x, 0, 1) + lamda*GaussianPDF(x, mu, sigma)
 
     class GaussianMixtureCDF(sympy.Function):
         nargs = 4
@@ -520,7 +520,7 @@ def build_copula_mixture_loss_and_grad():
                                 for grad_fn in ufuncify_grad_fns])        
         assert False
     
-    return calc_log_lhd, calc_log_lhd_gradient, calc_GaussianMixtureCDF_inverse
+    return calc_log_lhd, calc_log_lhd_gradient
 
 def build_squared_gradient_loss():
     try:
@@ -653,24 +653,37 @@ def build_squared_gradient_loss():
                     + sympy.diff(sym_log_lhd, sigma_s)**2
                     + sympy.diff(sym_log_lhd, rho_s)**2
                     + sympy.diff(sym_log_lhd, lamda_s)**2 )
-        pv_loss_fn = loss_fn.subs({z1_s: pv_1, z2_s: pv_2})
+        #pv_loss_fn = sympy.log(loss_fn.subs({z1_s: pv_1, z2_s: pv_2})) \
+        #    - 10*pv_sym_log_lhd
+
+        pv_loss_fn = sympy.log(loss_fn.subs({z1_s: pv_1, z2_s: pv_2}))
         
+        """
+        loss_fn = ( sympy.diff(pv_sym_log_lhd, mu_s)**2
+                    + sympy.diff(pv_sym_log_lhd, sigma_s)**2
+                    + sympy.diff(pv_sym_log_lhd, rho_s)**2
+                    + sympy.diff(pv_sym_log_lhd, lamda_s)**2 )
+        pv_loss_fn = loss_fn #sympy.log(loss_fn.subs({z1_s: pv_1, z2_s: pv_2})) 
+        sympy.pprint( loss_fn )
+        assert False
+        """
+        #pv_loss_fn = -pv_sym_log_lhd
         theano_loss = theano_function(
             (mu_s, sigma_s, rho_s, lamda_s, pv_1, pv_2), 
             [pv_loss_fn,],
             dims={mu_s:1, sigma_s:1, rho_s:1, lamda_s:1, pv_1: 1, pv_2:1})
-        
+
         sym_gradients = []
-        for sym in (mu_s, sigma_s, rho_s, lamda_s):
+        for sym in []: #(mu_s, sigma_s, rho_s, lamda_s):
             sym_grad = sympy.diff(loss_fn, sym)
             pv_sym_grad = sym_grad.subs({z1_s: pv_1, z2_s: pv_2})
             sym_gradients.append( pv_sym_grad )
 
-        theano_gradient = theano_function(
-            (mu_s, sigma_s, rho_s, lamda_s, pv_1, pv_2), 
-            sym_gradients,
-            dims={mu_s:1, sigma_s:1, rho_s:1, lamda_s:1, pv_1: 1, pv_2:1})
-
+        theano_gradient = None
+        #theano_gradient = theano_function(
+        #    (mu_s, sigma_s, rho_s, lamda_s, pv_1, pv_2), 
+        #    sym_gradients,
+        #    dims={mu_s:1, sigma_s:1, rho_s:1, lamda_s:1, pv_1: 1, pv_2:1})
         with open("cached_fn.obj", "wb") as fp:
             pickle.dump((theano_loss, theano_gradient), fp)
     

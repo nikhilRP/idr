@@ -2,17 +2,6 @@ import os, sys
 
 import math
 
-import ctypes
-
-class c_OptimizationRV(ctypes.Structure):
-    _fields_ = [("n_iters", ctypes.c_int), 
-                ("rho", ctypes.c_double), 
-                ("p", ctypes.c_double)]
-                
-C_em_gaussian = ctypes.cdll.LoadLibrary(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                 "IDR_parameter_estimation.so")).em_gaussian
-C_em_gaussian.restype = c_OptimizationRV
 
 import numpy
 
@@ -29,9 +18,28 @@ QUIET = False
 
 IGNORE_NONOVERLAPPING_PEAKS = False
 
-from pseudo_value_method import em_gaussian
+MAX_NUM_ITER = 1000
+EPS = 1e-4
 
-def em_gaussian_old(ranks_1, ranks_2):
+from pseudo_value_method import take_EM_steps, estimate_model_params
+
+def pseudo_value_estimator(ranks_1, ranks_2, fix_mu=True, fix_sigma=True):
+    pass
+
+
+def old_estimator(ranks_1, ranks_2):
+    import ctypes
+    
+    class c_OptimizationRV(ctypes.Structure):
+        _fields_ = [("n_iters", ctypes.c_int), 
+                    ("rho", ctypes.c_double), 
+                    ("p", ctypes.c_double)]
+
+    C_em_gaussian = ctypes.cdll.LoadLibrary(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                     "IDR_parameter_estimation.so")).em_gaussian
+    C_em_gaussian.restype = c_OptimizationRV
+    
     n = len(ranks_1)
     assert( n == len(ranks_1) == len(ranks_2) )
     localIDR = numpy.zeros(n, dtype='d')
@@ -41,8 +49,8 @@ def em_gaussian_old(ranks_1, ranks_2):
         ranks_2.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
         localIDR.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
         (ctypes.c_int(1) if VERBOSE else ctypes.c_int(0)) )
-    n_iters, rho, p = rv.n_iters, rv.rho, rv.p
-    return (n_iters, rho, p), localIDR
+    
+    return( 0.0, 1.0, float(rv.rho), float(rv.p) )
 
 
 def load_bed(fp, signal_type):
@@ -129,8 +137,8 @@ def build_rank_vectors(merged_peaks):
     for i, x in enumerate(merged_peaks):
         s1[i], s2[i] = x[4], x[5]
 
-    rank1 = numpy.lexsort((numpy.random.random(len(s1)), -s1)).argsort()
-    rank2 = numpy.lexsort((numpy.random.random(len(s2)), -s2)).argsort()
+    rank1 = numpy.lexsort((numpy.random.random(len(s1)), s1)).argsort()
+    rank2 = numpy.lexsort((numpy.random.random(len(s2)), s2)).argsort()
     
     return numpy.array(rank1, dtype='i'), numpy.array(rank2, dtype='i')
 
@@ -150,6 +158,12 @@ def build_idr_output_line(
     rv.append(strand)
         
     return "\t".join(rv)
+
+def fit_model_params(r1, r2, 
+                     fix_mu=True,
+                     fix_sigma=True,
+                     method="pseudo_value"):
+    pass
 
 def parse_args():
     import argparse
@@ -238,15 +252,26 @@ def main():
     log("Ranking peaks", 'VERBOSE');
     s1, s2 = build_rank_vectors(merged_peaks)
     
+    #with open("test_data2.txt", "w") as ofp:
+    #    for x, y in zip(s1, s2):
+    #        ofp.write("%e\t%e\n" % (x, y))
+    #return
     if( len(merged_peaks) < 20 ):
         error_msg = "Peak files must contain at least 20 peaks post-merge"
         error_msg += "\nHint: Merged peaks were written to the output file"
         for pk in merged_peaks: print( pk, file=args.output_file )
         raise ValueError(error_msg)
+
+    #print( estimate_model_params(s1, s2, (1, 1, 0.8, 0.8), 
+    #                             fix_mu=False, fix_sigma=False)  )
+
+    print( old_estimator(s1, s2) )
     
-    em_gaussian(s1, s2, ((0,0), (1,1), 0.8, 0.8), 
-                False, False, False) 
+    #theta, log_lhd =  take_EM_steps(s1, s2, (1, 1, 0.50, 0.50), 
+    #                                N=1000, fix_mu=True, fix_sigma=True) 
+    
     return
+    
     # fit the model parameters    
     # (e.g. call the local idr C estimation code)
     log("Fitting the model parameters", 'VERBOSE');
