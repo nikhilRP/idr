@@ -252,19 +252,14 @@ int main(int argc, char* argv[])
         ranks_A, ranks_B );
 
     vector< pair<int, double> > idr(ranks_A.size());
-
     fprintf(stderr, "Fit 2-component model - started\n");
-
-    em_gaussian(ranks_A, ranks_B, idr);
-
-    /* Make a copy of the local IDR vector, and then
-       update the 'second' field to store the global
-       IDR value (XXX use decent variable names...) */
-    vector<double> idrLocal(ranks_A.size());
-
+    double* localIDR = (double*) malloc(sizeof(double)*ranks_A.size());
+    em_gaussian(ranks_A.size(), ranks_A.data(), ranks_B.data(), localIDR);
+    
     for(int i=0; i<idr.size(); ++i)
     {
-        idrLocal[i] = idr[i].second;
+        idr[i].first = i+1;
+        idr[i].second = localIDR[i];
     }
 
     sort(idr.begin(), idr.end(), sort_pred());
@@ -283,7 +278,7 @@ int main(int argc, char* argv[])
     sort(idr.begin(), idr.end());
     for (unsigned int i=0; i<idr.size(); ++i)
     {
-        overlaps[i].idrLocal = idrLocal[i];
+        overlaps[i].idrLocal = localIDR[i];
         overlaps[i].idr = idr[i].second;
     }
     std::filebuf fb;
